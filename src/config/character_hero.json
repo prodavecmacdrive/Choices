@@ -1,0 +1,46 @@
+{
+    "id": "hero_rags",
+    "atlas": "characters_sheet",
+    "rootScale": {
+        "x": 0.416,
+        "y": 0.416
+    },
+    "parts": {
+        "body": "hero_body_rags",
+        "head": "hero_head_base",
+        "hair": "hero_hair_curly",
+        "arm_left": "hero_arm_l_rags",
+        "arm_right": "hero_arm_r_rags",
+        "leg_upper_left": "hero_leg_l_rags",
+        "leg_upper_right": "hero_leg_r_rags",
+        "foot_left": "hero_foot_bare_l",
+        "foot_right": "hero_foot_bare_r"
+    },
+    "faces": {
+        "idle": "hero_face_idle",
+        "surprised": "hero_face_surprised",
+        "happy": "hero_face_happy",
+        "amazed": "hero_face_amazed"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {
+            "offset": {
+                "x": 0,
+                "y": -60
+            }
+        },
+        "hair": {
+            "offset": {
+                "x": 0,
+                "y": 110
+            }
+        },
+        "face": {
+            "offset": {
+                "x": 0,
+                "y": 60
+            }
+        }
+    }
+}

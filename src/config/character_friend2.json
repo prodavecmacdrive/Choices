@@ -1,0 +1,38 @@
+{
+    "id": "friend2_rags",
+    "atlas": "characters_sheet",
+    "rootScale": {
+        "x": 0.416,
+        "y": 0.416
+    },
+    "parts": {
+        "body": "friend2_body_rags",
+        "head": "friend2_head_base",
+        "hair": "friend2_hair_curly",
+        "arm_left": "friend2_arm_l_rags",
+        "arm_right": "friend2_arm_r_rags",
+        "leg_upper_left": "friend2_leg_l_rags",
+        "leg_upper_right": "friend2_leg_r_rags",
+        "foot_left": "friend2_foot_bare_l",
+        "foot_right": "friend2_foot_bare_r"
+    },
+    "faces": {
+        "idle": "friend2_face_idle"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {},
+        "hair": {
+            "offset": {
+                "x": 10,
+                "y": 45
+            }
+        },
+        "face": {
+            "offset": {
+                "x": -2,
+                "y": 5
+            }
+        }
+    }
+}

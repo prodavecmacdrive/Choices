@@ -1,0 +1,83 @@
+{
+    "id": "girl2_dress",
+    "atlas": "characters_sheet",
+    "rootScale": {
+        "x": -0.416,
+        "y": 0.416
+    },
+    "parts": {
+        "body": "girl2_body_rags",
+        "head": "girl2_head_base",
+        "hair": "girl2_hair_curly",
+        "arm_left": "girl2_arm_l_rags",
+        "arm_right": "girl2_arm_r_rags",
+        "leg_upper_left": "girl2_leg_l_rags",
+        "leg_upper_right": "girl2_leg_r_rags",
+        "foot_left": "girl2_foot_bare_l",
+        "foot_right": "girl2_foot_bare_r"
+    },
+    "faces": {
+        "idle": "girl2_face_idle",
+        "kiss": "girl2_face_kiss"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {
+            "offset": {
+                "x": 10,
+                "y": -70
+            }
+        },
+        "hair": {
+            "offset": {
+                "x": -20,
+                "y": 110
+            }
+        },
+        "face": {
+            "offset": {}
+        },
+        "body": {
+            "offset": {
+                "x": 0,
+                "y": -160
+            }
+        },
+        "arm_left": {
+            "offset": {
+                "x": -20,
+                "y": 0
+            }
+        },
+        "arm_right": {
+            "offset": {
+                "x": 25,
+                "y": 0
+            }
+        },
+        "leg_upper_left": {
+            "offset": {
+                "x": 0,
+                "y": 56
+            }
+        },
+        "leg_upper_right": {
+            "offset": {
+                "x": 0,
+                "y": 56
+            }
+        },
+        "foot_left": {
+            "offset": {
+                "x": 0,
+                "y": -5
+            }
+        },
+        "foot_right": {
+            "offset": {
+                "x": 0,
+                "y": -5
+            }
+        }
+    }
+}

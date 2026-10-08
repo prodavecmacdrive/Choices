@@ -1,0 +1,168 @@
+{
+    "balance": {
+        "position": {
+            "portrait": {
+                "x": 440,
+                "y": 120
+            },
+            "landscape": {
+                "x": 460,
+                "y": 80
+            },
+            "x": 450,
+            "y": 120
+        },
+        "background": {
+            "texture": "bg_balance_plate",
+            "x": 0,
+            "y": 0,
+            "scale": {
+                "x": 0.68,
+                "y": 0.68
+            }
+        },
+        "icon": {
+            "texture": "icon_coin_gold",
+            "x": -100,
+            "y": 0,
+            "scale": {
+                "x": 0.57,
+                "y": 0.57
+            }
+        },
+        "label": {
+            "x": 18,
+            "y": -25,
+            "style": {
+                "fontFamily": "Arial, sans-serif",
+                "fontSize": "13px",
+                "fontStyle": "bold",
+                "color": "#ffea00",
+                "stroke": "#291b00",
+                "strokeThickness": 3,
+                "align": "center"
+            }
+        },
+        "text": {
+            "x": 18,
+            "y": 1,
+            "style": {
+                "fontFamily": "Arial, sans-serif",
+                "fontSize": "20px",
+                "fontStyle": "bold",
+                "color": "#ffffff",
+                "stroke": "#141414",
+                "strokeThickness": 4,
+                "align": "center"
+            }
+        }
+    },
+    "choice_group": {
+        "position": {
+            "portrait": {
+                "x": 300,
+                "y": 150
+            },
+            "landscape": {
+                "x": 300,
+                "y": 140
+            },
+            "x": 300,
+            "y": 150
+        },
+        "spacing": 260,
+        "spacing_responsive": {
+            "portrait": 240,
+            "landscape": 260
+        },
+        "positions_y": {
+            "single": -145,
+            "multiple": 205
+        }
+    },
+    "choice_card": {
+        "background": {
+            "texture": "card_choice_frame",
+            "x": 0,
+            "y": 0,
+            "scale": 0.48
+        },
+        "icon": {
+            "x": -66.5,
+            "y": 0,
+            "scale": 0.475
+        },
+        "title": {
+            "x": 36,
+            "y": -14,
+            "style": {
+                "fontFamily": "Arial, sans-serif",
+                "fontSize": "13px",
+                "fontStyle": "bold",
+                "color": "#163b1a",
+                "align": "center"
+            }
+        },
+        "price": {
+            "x": 32,
+            "y": 16,
+            "style": {
+                "fontFamily": "Arial, sans-serif",
+                "fontSize": "18px",
+                "fontStyle": "bold",
+                "color": "#09250b",
+                "align": "center"
+            }
+        }
+    },
+    "ring_box": {
+        "bottom": {
+            "texture": "ring_box_bottom",
+            "x": 0,
+            "y": 10,
+            "scale": 0.55
+        },
+        "top": {
+            "texture": "ring_box_top",
+            "x": -28,
+            "y": 1,
+            "scale": 0.55,
+            "origin": {
+                "x": 0.12,
+                "y": 0.88
+            }
+        }
+    },
+    "business_center": {
+        "texture": "buisnes_center",
+        "scale": 0.36,
+        "offsetX": 115,
+        "doorOffsetX": -50,
+        "doorOffsetY": -4,
+        "appearDuration": 1500,
+        "appearEase": "Cubic.easeOut",
+        "origin": {
+            "x": 0.5,
+            "y": 1.0
+        }
+    },
+    "golden_toilet": {
+        "offsetX": 175,
+        "bottom": {
+            "texture": "golden_toilet_bottom",
+            "scale": 0.44,
+            "origin": {
+                "x": 0.5,
+                "y": 1.0
+            }
+        },
+        "top": {
+            "texture": "golden_toilet_top",
+            "scale": 0.44,
+            "origin": {
+                "x": 0.673,
+                "y": 0.510
+            }
+        }
+    }
+}

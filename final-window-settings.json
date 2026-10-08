@@ -1,0 +1,19 @@
+{
+  "overlay": {
+    "color": "#000000",
+    "fillAlpha": 0.5,
+    "depth": 100
+  },
+  "button": {
+    "texture": "ui_button",
+    "text": "",
+    "align": "Center",
+    "portraitX": 0,
+    "portraitY": 0,
+    "landscapeX": 0,
+    "landscapeY": 0,
+    "pScale": 0,
+    "lScale": 0,
+    "depth": 105
+  }
+}

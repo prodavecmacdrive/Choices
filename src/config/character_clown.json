@@ -1,0 +1,70 @@
+{
+    "id": "clown_rags",
+    "atlas": "characters_sheet",
+    "rootScale": {
+        "x": -0.616,
+        "y": 0.616
+    },
+    "parts": {
+        "body": "clown_body_rags",
+        "head": "clown_head_base",
+        "hair": "clown_hair_curly",
+        "arm_left": "clown_arm_l_rags",
+        "arm_right": "clown_arm_r_rags",
+        "leg_upper_left": "clown_leg_l_rags",
+        "leg_upper_right": "clown_leg_r_rags",
+        "foot_left": "clown_foot_bare_l",
+        "foot_right": "clown_foot_bare_r"
+    },
+    "faces": {
+        "idle": "clown_face_idle",
+        "kiss": "clown_face_kiss"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {
+            "offset": {
+                "x": 0,
+                "y": -40
+            },
+            "zIndex": 25
+        },
+        "hair": {
+            "offset": {
+                "x": -11,
+                "y": 90
+            },
+            "zIndex": 75
+        },
+        "face": {
+            "offset": {
+                "x": -10,
+                "y": 20
+            }
+        },
+        "arm_left": {
+            "offset": {
+                "x": -15,
+                "y": -38
+            }
+        },
+        "arm_right": {
+            "offset": {
+                "x": 15,
+                "y": -38
+            }
+        },
+        "foot_left": {
+            "offset": {
+                "x": -19,
+                "y": -5
+            }
+        },
+        "foot_right": {
+            "offset": {
+                "x": -19,
+                "y": -5
+            }
+        }
+    }
+}

@@ -1,0 +1,246 @@
+{
+    "start_balance": 500000,
+    "start_step": "step_intro",
+    "walk_speed": 500,
+    "ground_y": 285,
+    "ground_texture_y": 182.4,
+    "hero_y_offset": 26,
+    "camera_approach": {
+        "y_offset": 180,
+        "character_scale_multiplier": 2.0,
+        "camera_zoom": 1.25,
+        "duration": 1400,
+        "ease": "Power1.easeInOut"
+    },
+    "portrait_multipliers": {
+        "character_scale": 0.76,
+        "crowd_spacing": 0.58,
+        "bg_scale_multiplier": 1.0,
+        "bg_shift_y": -160,
+        "world_scale": 1.0,
+        "hero_y_offset": 33
+    },
+    "landscape_multipliers": {
+        "character_scale": 1.0,
+        "crowd_spacing": 1.0,
+        "bg_scale_multiplier": 1.0,
+        "bg_shift_y": -200,
+        "world_scale": 1.0,
+        "hero_y_offset": 11
+    },
+    "locations": {
+        "road_bg": {
+            "shift": {
+                "x": 0,
+                "y": 0
+            },
+            "scale": {
+                "x": 1.5625,
+                "y": 1.5625
+            }
+        },
+        "jewel_building_bg": {
+            "shift": {
+                "x": 0,
+                "y": 0
+            },
+            "scale": {
+                "x": 1.5625,
+                "y": 1.5625
+            }
+        },
+        "luxury_house_bg": {
+            "shift": {
+                "x": 0,
+                "y": 0
+            },
+            "scale": {
+                "x": 1.5625,
+                "y": 1.5625
+            }
+        },
+        "simple_house_bg": {
+            "shift": {
+                "x": 0,
+                "y": 0
+            },
+            "scale": {
+                "x": 1.5625,
+                "y": 1.5625
+            }
+        }
+    },
+    "steps": {
+        "step_intro": {
+            "location": "road_bg",
+            "actors": [
+                {
+                    "id": "hero",
+                    "skin": "hero_rags",
+                    "position": "center",
+                    "face": "idle"
+                }
+            ],
+            "actions": [
+                {
+                    "type": "crowd_enter",
+                    "actors": [
+                        "girl_1",
+                        "friend1",
+                        "friend2",
+                        "friend3",
+                        "friend4",
+                        "friend5"
+                    ]
+                }
+            ],
+            "next": "step_choose_intro"
+        },
+        "step_choose_intro": {
+            "location": "road_bg",
+            "choices": [
+                {
+                    "id": "choice_business_center",
+                    "icon": "buisnes_center_ico",
+                    "title": "CHOICE_BUSINESS_CENTER",
+                    "price": 400000,
+                    "next": "step_business_center"
+                },
+                {
+                    "id": "choice_golden_toilet",
+                    "icon": "golden_toilet_ico",
+                    "title": "CHOICE_GOLDEN_TOILET",
+                    "price": 350000,
+                    "next": "step_golden_toilet"
+                }
+            ]
+        },
+        "step_business_center": {
+            "location": "road_bg",
+            "branch": "business_center",
+            "price": 400000,
+            "revenue": 750000,
+            "next": "step_walk_to_jewel"
+        },
+        "step_golden_toilet": {
+            "location": "road_bg",
+            "branch": "golden_toilet",
+            "price": 350000,
+            "next": "step_walk_to_jewel"
+        },
+        "step_walk_to_jewel": {
+            "location": "road_bg",
+            "actions": [
+                {
+                    "type": "pan_camera",
+                    "to_location": "jewel_building_bg",
+                    "duration": 4200
+                },
+                {
+                    "type": "walk",
+                    "actors": [
+                        "hero",
+                        "girl_1"
+                    ],
+                    "direction": "right"
+                },
+                {
+                    "type": "enter",
+                    "actor": "man_1",
+                    "skin": "man_rags",
+                    "from": "right",
+                    "to": "hero_right"
+                }
+            ],
+            "next": "step_choose_house"
+        },
+        "step_choose_house": {
+            "location": "jewel_building_bg",
+            "choices": [
+                {
+                    "id": "choice_luxury",
+                    "icon": "luxury_house_ico",
+                    "title": "CHOICE_LUXURY_HOUSE",
+                    "price": 750000,
+                    "next": "step_mansion_arrival"
+                },
+                {
+                    "id": "choice_simple",
+                    "icon": "simple_house_ico",
+                    "title": "CHOICE_SIMPLE_HOUSE",
+                    "price": 50000,
+                    "next": "step_shack_arrival"
+                }
+            ]
+        },
+        "step_mansion_arrival": {
+            "location": "luxury_house_bg",
+            "actors": [
+                {
+                    "id": "hero",
+                    "skin": "hero_rags",
+                    "position": "center",
+                    "face": "happy"
+                },
+                {
+                    "id": "girl_2",
+                    "skin": "girl2_dress",
+                    "position": "right",
+                    "face": "idle"
+                }
+            ],
+            "next": "step_choose_ring"
+        },
+        "step_shack_arrival": {
+            "location": "simple_house_bg",
+            "actors": [
+                {
+                    "id": "hero",
+                    "skin": "hero_rags",
+                    "position": "center",
+                    "face": "happy"
+                },
+                {
+                    "id": "girl_2",
+                    "skin": "girl2_dress",
+                    "position": "right",
+                    "face": "idle"
+                }
+            ],
+            "next": "step_choose_ring"
+        },
+        "step_choose_ring": {
+            "choices": [
+                {
+                    "id": "choice_clown",
+                    "icon": "clown_ico",
+                    "title": "CHOICE_CLOWN",
+                    "price": 0,
+                    "next": "step_fail_end"
+                },
+                {
+                    "id": "choice_girl2",
+                    "icon": "girl2_ico",
+                    "title": "CHOICE_GIRL2",
+                    "price": 100000,
+                    "next": "step_fail_end"
+                }
+            ]
+        },
+        "step_fail_end": {
+            "actions": [
+                {
+                    "type": "exit",
+                    "actor": "girl_2",
+                    "to": "right"
+                },
+                {
+                    "type": "set_face",
+                    "actor": "hero",
+                    "face": "amazed"
+                }
+            ],
+            "fail": true
+        }
+    }
+}

@@ -1,0 +1,23 @@
+{
+  "economy": {
+    "start_balance": 500000,
+    "business_center_cost": 400000,
+    "business_center_revenue": 700000,
+    "golden_toilet_cost": 350000,
+    "luxury_house_cost": 750000,
+    "default_house_cost": 50000,
+    "ring_cost": 100000
+  },
+  "button": {
+    "texture": "ui_button",
+    "text": "Click me",
+    "align": "Center",
+    "portraitX": 0,
+    "portraitY": 0,
+    "landscapeX": 0,
+    "landscapeY": 0,
+    "pScale": 0.6,
+    "lScale": 0.6,
+    "depth": 10
+  }
+}
