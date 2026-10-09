@@ -2,7 +2,7 @@
   "tickDuration": 130,
   "fadeOutBeforeExitMs": 1000,
   "fxContainerDepth": 35,
-  "groundCutoffY": 382,
+  "groundCutoffY": 460,
   "beamBrightnessCoefficient": 0.4,
   "nightOverlay": {
     "enabled": true,

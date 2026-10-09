@@ -77,6 +77,23 @@ export default class FinalWindow {
             window.trackAxonEvent('ENDCARD_SHOWN');
         }
 
+        // Explicitly stop all character movement and looping footstep/walk SFX
+        if (this._scene?.storyController && typeof this._scene.storyController.stopAllWalkSounds === 'function') {
+            this._scene.storyController.stopAllWalkSounds();
+        } else if (this._scene?.storyController && typeof this._scene.storyController._stopAllWalkSounds === 'function') {
+            this._scene.storyController._stopAllWalkSounds();
+        }
+        if (this._scene?.sound?.sounds) {
+            this._scene.sound.sounds.forEach(snd => {
+                if (snd) {
+                    const markerName = snd.currentMarker?.name || snd.key;
+                    if (markerName === 'steps_walk' || markerName === 'walk_loop' || markerName === 'footsteps') {
+                        try { snd.stop(); } catch (e) { }
+                    }
+                }
+            });
+        }
+
         try {
             Utils.addAudio(this._scene, 'fail_stinger', 1.0);
         } catch (e) {}

@@ -4,6 +4,11 @@ export default class PuppetCharacter extends Phaser.GameObjects.Container {
         this.scene = scene;
         this.skeleton = skeletonConfig;
         this.skin = characterConfig;
+        if (this.skin) {
+            this.skin.setAttachment = (boneName, textureName) => {
+                this.setAttachment(boneName, textureName);
+            };
+        }
         this.bones = {};
         this.faceSprite = null;
         this.currentFace = this.skin?.defaultFace || 'idle';
@@ -139,12 +144,57 @@ export default class PuppetCharacter extends Phaser.GameObjects.Container {
 
     setFace(faceKey) {
         if (!this.faceSprite) return;
-        const faceTexName = this.skin?.faces?.[faceKey] || this.skin?.faces?.[this.skin?.defaultFace];
+        let faceTexName = this.skin?.faces?.[faceKey];
+        if (!faceTexName && this.scene.textures.exists(faceKey)) {
+            faceTexName = faceKey;
+        }
+        if (!faceTexName && faceKey === 'crying' && this.scene.textures.exists('hero_face_crying')) {
+            faceTexName = 'hero_face_crying';
+        }
+        if (!faceTexName && (faceKey === 'laugh' || faceKey === 'happy')) {
+            faceTexName = this.skin?.faces?.['happy'] || this.skin?.faces?.[this.skin?.defaultFace];
+        }
+        if (!faceTexName) {
+            faceTexName = this.skin?.faces?.[this.skin?.defaultFace];
+        }
         if (!faceTexName) return;
 
         const { textureKey, frameKey } = this._resolveTexture(faceTexName);
         this.faceSprite.setTexture(textureKey, frameKey);
         this.currentFace = faceKey;
+    }
+
+    setAttachment(boneName, textureName) {
+        let actualBone = boneName;
+        if (boneName === 'leg_left') actualBone = 'leg_upper_left';
+        if (boneName === 'leg_right') actualBone = 'leg_upper_right';
+
+        if (actualBone === 'face') {
+            if (this.faceSprite) {
+                const { textureKey, frameKey } = this._resolveTexture(textureName);
+                this.faceSprite.setTexture(textureKey, frameKey);
+            }
+            return;
+        }
+
+        const boneContainer = this.bones[actualBone];
+        if (!boneContainer) return;
+
+        let sprite = boneContainer.list?.find(c => c.type === 'Sprite');
+        const { textureKey, frameKey } = this._resolveTexture(textureName);
+        if (sprite) {
+            sprite.setTexture(textureKey, frameKey);
+        } else {
+            const boneDef = this.effectiveBones?.[actualBone] || {};
+            sprite = this.scene.add.sprite(0, 0, textureKey, frameKey);
+            sprite.setOrigin(boneDef.pivot?.x ?? 0.5, boneDef.pivot?.y ?? 0.5);
+            sprite.setDepth(boneDef.zIndex || 0);
+            boneContainer.add(sprite);
+        }
+
+        if (this.skin && this.skin.parts) {
+            this.skin.parts[actualBone] = textureName;
+        }
     }
 
     resetPose() {

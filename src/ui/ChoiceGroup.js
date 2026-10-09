@@ -127,7 +127,10 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
             const titleX = titleCfg.x !== undefined ? titleCfg.x : 32;
             const titleY = titleCfg.y !== undefined ? titleCfg.y : -14;
             const titleKey = choice.title;
-            const titleStr = LOCALIZATION?.en?.[titleKey] || titleKey;
+            const titleStr = LOCALIZATION?.en?.[titleKey]
+                || (choice.id && LOCALIZATION?.en?.[choice.id])
+                || (typeof titleKey === 'string' && LOCALIZATION?.en?.[titleKey.toUpperCase()])
+                || titleKey;
             const titleStyle = titleCfg.style || {
                 fontFamily: 'Arial, sans-serif',
                 fontSize: '13px',

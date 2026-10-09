@@ -2,30 +2,31 @@
     "start_balance": 500000,
     "start_step": "step_intro",
     "walk_speed": 500,
-    "ground_y": 285,
-    "ground_texture_y": 182.4,
+    "ground_y": 355,
+    "ground_texture_y": 227.2,
+    "lemonade_stand_y": 355,
     "hero_y_offset": 26,
     "camera_approach": {
         "y_offset": 180,
-        "character_scale_multiplier": 2.0,
+        "character_scale_multiplier": 2,
         "camera_zoom": 1.25,
         "duration": 1400,
         "ease": "Power1.easeInOut"
     },
     "portrait_multipliers": {
-        "character_scale": 0.76,
+        "character_scale": 0.88,
         "crowd_spacing": 0.58,
-        "bg_scale_multiplier": 1.0,
+        "bg_scale_multiplier": 1,
         "bg_shift_y": -160,
-        "world_scale": 1.0,
+        "world_scale": 1,
         "hero_y_offset": 33
     },
     "landscape_multipliers": {
-        "character_scale": 1.0,
-        "crowd_spacing": 1.0,
-        "bg_scale_multiplier": 1.0,
+        "character_scale": 0.88,
+        "crowd_spacing": 1,
+        "bg_scale_multiplier": 1,
         "bg_shift_y": -200,
-        "world_scale": 1.0,
+        "world_scale": 1,
         "hero_y_offset": 11
     },
     "locations": {
@@ -100,33 +101,33 @@
             "location": "road_bg",
             "choices": [
                 {
-                    "id": "choice_business_center",
-                    "icon": "buisnes_center_ico",
-                    "title": "CHOICE_BUSINESS_CENTER",
+                    "id": "choice_lemonade_stand",
+                    "icon": "lemonade_stand_ico",
+                    "title": "LEMONADE_STAND",
                     "price": 400000,
-                    "next": "step_business_center"
+                    "next": "step_lemonade_stand"
                 },
                 {
-                    "id": "choice_golden_toilet",
-                    "icon": "golden_toilet_ico",
-                    "title": "CHOICE_GOLDEN_TOILET",
+                    "id": "choice_good_business",
+                    "icon": "prestige_ico",
+                    "title": "CHOICE_GOOD_BUSINESS",
                     "price": 350000,
-                    "next": "step_golden_toilet"
+                    "next": "step_good_business"
                 }
             ]
         },
-        "step_business_center": {
-            "location": "road_bg",
-            "branch": "business_center",
+        "step_lemonade_stand": {
+            "location": "jewel_building_bg",
+            "branch": "lemonade_stand",
             "price": 400000,
             "revenue": 750000,
-            "next": "step_walk_to_jewel"
+            "next": "step_choose_house"
         },
-        "step_golden_toilet": {
-            "location": "road_bg",
-            "branch": "golden_toilet",
+        "step_good_business": {
+            "location": "jewel_building_bg",
+            "branch": "good_business",
             "price": 350000,
-            "next": "step_walk_to_jewel"
+            "next": "step_choose_house"
         },
         "step_walk_to_jewel": {
             "location": "road_bg",
@@ -189,7 +190,7 @@
                     "face": "idle"
                 }
             ],
-            "next": "step_choose_ring"
+            "next": "step_choose_woman"
         },
         "step_shack_arrival": {
             "location": "simple_house_bg",
@@ -207,21 +208,21 @@
                     "face": "idle"
                 }
             ],
-            "next": "step_choose_ring"
+            "next": "step_choose_woman"
         },
         "step_choose_ring": {
             "choices": [
                 {
-                    "id": "choice_clown",
-                    "icon": "clown_ico",
-                    "title": "CHOICE_CLOWN",
+                    "id": "choice_bad_ring",
+                    "icon": "ring_bad_ico",
+                    "title": "CHOICE_BAD_RING",
                     "price": 0,
                     "next": "step_fail_end"
                 },
                 {
-                    "id": "choice_girl2",
-                    "icon": "girl2_ico",
-                    "title": "CHOICE_GIRL2",
+                    "id": "choice_luxury_ring",
+                    "icon": "ring_luxury_ico",
+                    "title": "CHOICE_LUXURY_RING",
                     "price": 100000,
                     "next": "step_fail_end"
                 }
@@ -241,6 +242,27 @@
                 }
             ],
             "fail": true
+        },
+        "step_fail_end_woman": {
+            "fail": true
+        },
+        "step_choose_woman": {
+            "choices": [
+                {
+                    "id": "choice_girl_2",
+                    "icon": "girl2_ico",
+                    "title": "CHOICE_GIRL2",
+                    "price": 100000,
+                    "next": "step_choose_ring"
+                },
+                {
+                    "id": "choice_girl_1",
+                    "icon": "girl1_ico",
+                    "title": "CHOICE_GIRL1",
+                    "price": 0,
+                    "next": "step_fail_end_woman"
+                }
+            ]
         }
     }
 }

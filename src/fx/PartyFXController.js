@@ -139,8 +139,17 @@ export default class PartyFXController {
         this._nightOverlay.fillStyle(this._parseColor(cfg.color), 1.0);
         this._nightOverlay.fillRect(cfg.x, cfg.y, cfg.width, cfg.height);
         this._nightOverlay.setDepth(cfg.depth !== undefined ? cfg.depth : 2);
-        this._nightOverlay.setAlpha(cfg.alpha !== undefined ? cfg.alpha : 0.8);
+        this._nightOverlay.setAlpha(0); // Start at 0 for smooth fade-in
         this._nightOverlay.setBlendMode(this._parseBlendMode(cfg.blendMode || 'NORMAL'));
+
+        const targetAlpha = cfg.alpha !== undefined ? cfg.alpha : 0.8;
+        const nightTween = this.scene.tweens.add({
+            targets: this._nightOverlay,
+            alpha: targetAlpha,
+            duration: 800,
+            ease: 'Linear'
+        });
+        this._activeTweens.push(nightTween);
 
         // Add to parentContainer (worldContainer) so it renders directly above roadBg (0) and building (1),
         // but below all characters (17-30) and light beams (35)
@@ -163,6 +172,14 @@ export default class PartyFXController {
         // Container holding light beams, masked by the ground line so edges are cut off at ground level
         this.beamsContainer = this.scene.add.container(0, 0);
         this.beamsContainer.setDepth(this.config?.fxContainerDepth || 35);
+        this.beamsContainer.alpha = 0; // Start at 0 for smooth fade-in
+        const beamsFadeIn = this.scene.tweens.add({
+            targets: this.beamsContainer,
+            alpha: 1,
+            duration: 800,
+            ease: 'Linear'
+        });
+        this._activeTweens.push(beamsFadeIn);
         if (this.fxContainer) {
             this.fxContainer.add(this.beamsContainer);
         }
@@ -501,6 +518,33 @@ export default class PartyFXController {
             this._smokeTimer = null;
         }
 
+        // Smoothly fade out darkening overlay
+        if (this._nightOverlay) {
+            this.scene.tweens.killTweensOf(this._nightOverlay);
+            const nightFade = this.scene.tweens.add({
+                targets: this._nightOverlay,
+                alpha: 0,
+                duration: fadeDuration,
+                ease: 'Power2.easeOut',
+                onComplete: () => {
+                    if (this._nightOverlay) this._nightOverlay.setVisible(false);
+                }
+            });
+            this._activeTweens.push(nightFade);
+        }
+
+        // Smoothly fade out beams container
+        if (this.beamsContainer) {
+            this.scene.tweens.killTweensOf(this.beamsContainer);
+            const beamsFade = this.scene.tweens.add({
+                targets: this.beamsContainer,
+                alpha: 0,
+                duration: fadeDuration,
+                ease: 'Power2.easeOut'
+            });
+            this._activeTweens.push(beamsFade);
+        }
+
         // Smoothly fade out light beams
         this._beamInstances.forEach(instance => {
             if (instance.activeDecayTween) {
@@ -712,10 +756,37 @@ export default class PartyFXController {
         this._isStopping = true;
 
         const celebCfg = this.config?.celebration || {};
-        const fadeDuration = celebCfg.fadeOutDuration || 750;
+        const fadeDuration = 800; // Smooth disappearance
         const fadeEase = celebCfg.fadeOutEase || 'Power2.easeOut';
 
-        // 1. Fade strobe into alpha 0
+        // 1. Smoothly fade out darkening overlay
+        if (this._nightOverlay) {
+            this.scene.tweens.killTweensOf(this._nightOverlay);
+            const nightFade = this.scene.tweens.add({
+                targets: this._nightOverlay,
+                alpha: 0,
+                duration: fadeDuration,
+                ease: fadeEase,
+                onComplete: () => {
+                    if (this._nightOverlay) this._nightOverlay.setVisible(false);
+                }
+            });
+            this._activeTweens.push(nightFade);
+        }
+
+        // 2. Smoothly fade out beams container
+        if (this.beamsContainer) {
+            this.scene.tweens.killTweensOf(this.beamsContainer);
+            const beamsFade = this.scene.tweens.add({
+                targets: this.beamsContainer,
+                alpha: 0,
+                duration: fadeDuration,
+                ease: fadeEase
+            });
+            this._activeTweens.push(beamsFade);
+        }
+
+        // 3. Fade strobe into alpha 0
         if (this._strobeRect) {
             this.scene.tweens.killTweensOf(this._strobeRect);
             const strobeFade = this.scene.tweens.add({
@@ -727,7 +798,7 @@ export default class PartyFXController {
             this._activeTweens.push(strobeFade);
         }
 
-        // 2. Fade all beams into alpha 0
+        // 4. Fade all beams into alpha 0
         this._beamInstances.forEach(instance => {
             if (instance.container) {
                 this.scene.tweens.killTweensOf(instance.container);

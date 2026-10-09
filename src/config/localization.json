@@ -4,9 +4,35 @@
         "CHOICE_GOLDEN_TOILET": "GOLDEN TOILET",
         "CHOICE_LUXURY_HOUSE": "LUXURY HOUSE",
         "CHOICE_SIMPLE_HOUSE": "SIMPLE HOUSE",
-        "CHOICE_RING": "RING",
         "CHOICE_CLOWN": "CLOWN",
-        "CHOICE_GIRL2": "GIRL",
-        "LABEL_CASH": "CASH"
+        "LABEL_CASH": "CASH",
+
+        "LEMONADE_STAND": "Lemonade Stand",
+        "CHOICE_LEMONADE_STAND": "Lemonade Stand",
+        "choice_lemonade_stand": "Lemonade Stand",
+
+        "CHOICE_GOOD_BUSINESS": "Good Job",
+        "CHOICE_PRESTIGE_SUIT": "Good Job",
+        "GOOD_JOB": "Good Job",
+        "choice_good_business": "Good Job",
+
+        "CHOICE_GIRL2": "Hot Model",
+        "CHOICE_GIRL_2": "Hot Model",
+        "HOT_MODEL": "Hot Model",
+        "choice_girl_2": "Hot Model",
+
+        "CHOICE_GIRL1": "Total Mess",
+        "CHOICE_GIRL_1": "Total Mess",
+        "TOTAL_MESS": "Total Mess",
+        "choice_girl_1": "Total Mess",
+
+        "CHOICE_BAD_RING": "Grandma Ring",
+        "GRANDMA_RING": "Grandma Ring",
+        "choice_bad_ring": "Grandma Ring",
+
+        "CHOICE_LUXURY_RING": "Luxury Ring",
+        "CHOICE_RING": "Luxury Ring",
+        "LUXURY_RING": "Luxury Ring",
+        "choice_luxury_ring": "Luxury Ring"
     }
 }

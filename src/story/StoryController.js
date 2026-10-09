@@ -15,7 +15,7 @@ export default class StoryController {
         }
         this.currentStepId = null;
         this.chosenHouse = null;
-        this.groundY = this.story?.ground_y || 285;
+        this.groundY = this.story?.ground_y || 355;
         const isPortrait = this.scene.scale.width < this.scene.scale.height;
         const portCfg = this.story?.portrait_multipliers || {};
         const landCfg = this.story?.landscape_multipliers || {};
@@ -24,7 +24,11 @@ export default class StoryController {
             ? currentMult.hero_y_offset
             : (this.story?.hero_y_offset !== undefined ? this.story.hero_y_offset : 26);
         this.heroGroundY = this.groundY + this.heroYOffset;
-        this.currentLocationKey = 'road_bg';
+        this.girl2YOffset = 38;
+        this.girl2GroundY = this.heroGroundY + this.girl2YOffset;
+        this.chosenRing = null;
+        this.ringBoxContainer = null;
+        this.currentLocationKey = 'jewel_building_bg';
         this.finaleButtons = [];
         this._toiletHeadTrackingListener = null;
         this._bcHeadTrackingListener = null;
@@ -49,8 +53,15 @@ export default class StoryController {
         this._walkerSounds = [];
         this._staggerTimeouts = [];
 
+        this._isStoppingPartyMusic = false;
+        this._partyMusicHandOffTimer = null;
+
         this.scene?.events?.once('shutdown', () => {
             this.restoreMainBgm(0);
+            if (this._partyMusicHandOffTimer) {
+                this._partyMusicHandOffTimer.remove();
+                this._partyMusicHandOffTimer = null;
+            }
             if (this._celloFallbackTimer) {
                 this._celloFallbackTimer.remove();
                 this._celloFallbackTimer = null;
@@ -123,9 +134,15 @@ export default class StoryController {
             this._staggerTimeouts = [];
         }
         if (this._walkerSounds) {
-            this._walkerSounds.forEach(s => s?.stop?.());
+            this._walkerSounds.forEach(s => {
+                try { s?.stop?.(); } catch (e) { }
+            });
             this._walkerSounds = [];
         }
+    }
+
+    stopAllWalkSounds() {
+        this._stopAllWalkSounds();
     }
 
     _startMainBgm() {
@@ -185,6 +202,9 @@ export default class StoryController {
     }
 
     restoreMainBgm(duration = 450) {
+        if (!this._mainBgm) {
+            this._startMainBgm();
+        }
         if (!this._mainBgm || !this.scene?.tweens) return;
 
         if (this._bgmDuckingTween) {
@@ -198,7 +218,7 @@ export default class StoryController {
         const targetVol = this._mainBgmNormalVolume ?? 0.5;
         const currentVol = (typeof this._mainBgm.volume === 'number')
             ? this._mainBgm.volume
-            : 0.15;
+            : 0;
 
         const tweenTarget = { volume: currentVol };
 
@@ -229,6 +249,96 @@ export default class StoryController {
         });
     }
 
+    _startPartyMusic() {
+        this.duckMainBgm(0, 800);
+
+        if (this._partyMusic) {
+            try { this._partyMusic.stop(); } catch (e) { }
+            this._partyMusic = null;
+        }
+
+        try {
+            this._partyMusic = Utils.addAudio(this.scene, 'music_party_loop', 0, true);
+            if (this._partyMusic) {
+                const target = { volume: 0 };
+                this.scene.tweens.add({
+                    targets: target,
+                    volume: 0.65,
+                    duration: 800,
+                    ease: 'Linear',
+                    onUpdate: () => {
+                        if (this._partyMusic) {
+                            if (typeof this._partyMusic.setVolume === 'function') {
+                                this._partyMusic.setVolume(target.volume);
+                            } else {
+                                this._partyMusic.volume = target.volume;
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (e) { }
+    }
+
+    _stopPartyMusic() {
+        if (this._isStoppingPartyMusic) return;
+        this._isStoppingPartyMusic = true;
+
+        if (this._partyMusic) {
+            const currentVol = (typeof this._partyMusic.volume === 'number') ? this._partyMusic.volume : 0.65;
+            const target = { volume: currentVol };
+            const pMusic = this._partyMusic;
+            this._partyMusic = null;
+
+            this.scene.tweens.add({
+                targets: target,
+                volume: 0,
+                duration: 600,
+                ease: 'Linear',
+                onUpdate: () => {
+                    if (pMusic) {
+                        if (typeof pMusic.setVolume === 'function') {
+                            pMusic.setVolume(target.volume);
+                        } else {
+                            pMusic.volume = target.volume;
+                        }
+                    }
+                },
+                onComplete: () => {
+                    try { pMusic.stop(); } catch (e) { }
+                }
+            });
+        }
+
+        let outroSound = null;
+        try {
+            outroSound = Utils.addAudio(this.scene, 'music_party_end', 0.6, false);
+        } catch (e) { }
+
+        let handedOff = false;
+        const handOff = () => {
+            if (handedOff) return;
+            handedOff = true;
+            this._isStoppingPartyMusic = false;
+            if (this._partyMusicHandOffTimer) {
+                this._partyMusicHandOffTimer.remove();
+                this._partyMusicHandOffTimer = null;
+            }
+            // Only start main BGM loop after party music outro has fully finished
+            this.restoreMainBgm(800);
+        };
+
+        if (outroSound && typeof outroSound.once === 'function') {
+            outroSound.once('complete', handOff);
+            outroSound.once('ended', handOff);
+            this._partyMusicHandOffTimer = this.scene.time.delayedCall(5300, handOff);
+        } else {
+            this._partyMusicHandOffTimer = this.scene.time.delayedCall(5300, handOff);
+        }
+    }
+
+    _stopToiletShake() { }
+
     fastForwardTransition() {
         if (!this.isTransitioning || !this._activeTransition) return;
 
@@ -237,6 +347,12 @@ export default class StoryController {
         this._activeTransition = null;
 
         this._stopToiletShake();
+        if (this._partyMusicHandOffTimer) {
+            this._partyMusicHandOffTimer.remove();
+            this._partyMusicHandOffTimer = null;
+            this._isStoppingPartyMusic = false;
+            this.restoreMainBgm(300);
+        }
         if (this._factoryWorkSound) {
             this._factoryWorkSound.stop();
             this._factoryWorkSound = null;
@@ -299,7 +415,8 @@ export default class StoryController {
         if (!puppet) return { x: 1, y: 1 };
         const isPortrait = this.scene.scale.width < this.scene.scale.height;
         const portCfg = this.story?.portrait_multipliers || {};
-        const charScaleMul = isPortrait ? (portCfg.character_scale ?? 0.76) : 1.0;
+        const landCfg = this.story?.landscape_multipliers || {};
+        const charScaleMul = isPortrait ? (portCfg.character_scale ?? 0.88) : (landCfg.character_scale ?? 0.88);
 
         const base = puppet.baseRootScale || {
             x: Math.abs(puppet.skin?.rootScale?.x || 0.416),
@@ -333,11 +450,11 @@ export default class StoryController {
             case 'step_choose_intro':
                 this._runStepChooseIntro();
                 break;
-            case 'step_business_center':
-                this._runStepBusinessCenter();
+            case 'step_lemonade_stand':
+                this._runStepLemonadeStand();
                 break;
-            case 'step_golden_toilet':
-                this._runStepGoldenToilet();
+            case 'step_good_business':
+                this._runStepGoodBusiness();
                 break;
             case 'step_walk_to_jewel':
                 this._runStepWalkToJewel();
@@ -349,11 +466,17 @@ export default class StoryController {
             case 'step_shack_arrival':
                 this._runStepHouseArrival();
                 break;
+            case 'step_choose_woman':
+                this._runStepChooseWoman();
+                break;
             case 'step_choose_ring':
                 this._runStepChooseRing();
                 break;
             case 'step_fail_end':
                 this._runStepFailEnd();
+                break;
+            case 'step_fail_end_woman':
+                this._runStepFailEndWoman();
                 break;
             default:
                 break;
@@ -393,6 +516,19 @@ export default class StoryController {
         if (this.scene?.cameras?.main) {
             this.scene.tweens.killTweensOf(this.scene.cameras.main);
             this.scene.cameras.main.zoom = 1.0;
+            this.scene.cameras.main.scrollX = 0;
+            this.scene.cameras.main.scrollY = 0;
+        }
+        if (this.scene?.uiCamera) {
+            this.scene.uiCamera.zoom = 1.0;
+            this.scene.uiCamera.scrollX = 0;
+            this.scene.uiCamera.scrollY = 0;
+        }
+        if (this.finaleButtons && this.finaleButtons.length > 0) {
+            this.finaleButtons.forEach(b => {
+                if (b && b.destroy) b.destroy();
+            });
+            this.finaleButtons = [];
         }
         if (this._activeTransition) {
             if (this._activeTransition.tweens) {
@@ -430,12 +566,12 @@ export default class StoryController {
         const friend4 = this.puppets.friend4;
         const friend5 = this.puppets.friend5;
 
-        this.currentLocationKey = 'road_bg';
+        this.currentLocationKey = 'jewel_building_bg';
 
         const isPortrait = this.scene.scale.width < this.scene.scale.height;
         const portCfg = this.story?.portrait_multipliers || {};
         const spacingMul = isPortrait ? (portCfg.crowd_spacing ?? 0.58) : 1.0;
-        const charScaleMul = isPortrait ? (portCfg.character_scale ?? 0.76) : 1.0;
+        const charScaleMul = isPortrait ? (portCfg.character_scale ?? 0.88) : 1.0;
 
         // Reset hero state in center of screen on road_bg
         if (hero) {
@@ -448,7 +584,22 @@ export default class StoryController {
             hero.animator?.playIdle();
         }
 
+        const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5];
+        friends.forEach(p => {
+            if (p) {
+                const pScale = this._getCharacterScale(p, 1);
+                p.setScale(pScale.x, pScale.y);
+            }
+        });
+
         // Hide subsequent characters
+        if (girl1) {
+            girl1.setVisible(false);
+            girl1.setFace('idle');
+            girl1.angle = 0;
+            girl1.resetPose();
+            girl1.animator?.stopAll();
+        }
         if (girl2) {
             girl2.setVisible(false);
             girl2.setFace('idle');
@@ -471,90 +622,15 @@ export default class StoryController {
             this.ui.worldContainer.x = 300;
         }
 
-        // Off-screen Spawning: girl_1 and the 5 new friends (friend1 to friend5)
-        // Camera viewport in world container coords is [-300, 300]
-        // Staggered depths break pyramid symmetry and yOffset aligns feet with ground perspective:
-        // lower depth (further away) -> feet higher in perspective (negative yOffset)
-        // higher depth (closer) -> feet lower in perspective (positive yOffset)
-        const crowdConfigs = [
-            { puppet: girl1, fromX: -420, targetX: -115, baseTargetOffsetX: -115, depth: 21, yOffset: -2, facing: 1, danceStyle: 'girl_turn_dance' },
-            { puppet: friend1, fromX: -490, targetX: -210, baseTargetOffsetX: -210, depth: 17, yOffset: -16, facing: 1, danceStyle: 'sharp_jumps' },
-            { puppet: friend2, fromX: -560, targetX: -310, baseTargetOffsetX: -310, depth: 23, yOffset: 6, facing: 1, danceStyle: 'wave_arms' },
-            { puppet: friend3, fromX: 420, targetX: 115, baseTargetOffsetX: 115, depth: 18, yOffset: -13, facing: -1, danceStyle: 'throw_arms' },
-            { puppet: friend4, fromX: 490, targetX: 210, baseTargetOffsetX: 210, depth: 25, yOffset: 9, facing: -1, danceStyle: 'step_raise' },
-            { puppet: friend5, fromX: 560, targetX: 310, baseTargetOffsetX: 310, depth: 19, yOffset: -9, facing: -1, danceStyle: 'spins' }
-        ];
+        // Off-screen Spawning removed per requirement. Hero is completely alone.
 
-        let arrivedCount = 0;
-        const activeCrowd = crowdConfigs.filter(c => !!c.puppet);
-        const totalCrowd = activeCrowd.length;
+        // Start background music as before
+        this._startMainBgm();
 
-        const onCrowdArrived = () => {
-            // Once crowd is in place and dancing, prompt choices
-            this.scene.time.delayedCall(400, () => {
-                this.goToStep('step_choose_intro');
-            });
-        };
-
-        if (totalCrowd === 0) {
-            onCrowdArrived();
-            return;
-        }
-
-        // Start Scene 1 party visual effects (ground smoke, light beams, rhythm sequencer)
-        this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
-        this.partyFX.start();
-
-        // Background Music: music_party_loop starts when crowd and Girl 1 enter and begin dancing
-        if (!this._partyMusic) {
-            try {
-                this._partyMusic = Utils.addAudio(this.scene, 'music_party_loop', 0.55, true);
-            } catch (e) { }
-        }
-
-        activeCrowd.forEach((cfg) => {
-            const p = cfg.puppet;
-            p.facing = cfg.facing;
-            p.baseTargetOffsetX = cfg.baseTargetOffsetX;
-            p.baseYOffset = cfg.yOffset || 0;
-            const pScale = this._getCharacterScale(p, cfg.facing);
-            p.setScale(pScale.x, pScale.y);
-            if (cfg.depth !== undefined) p.setDepth(cfg.depth);
-
-            const effectiveTargetX = Math.round(p.baseTargetOffsetX * spacingMul);
-            const fromX = isPortrait ? (p.baseTargetOffsetX < 0 ? -380 : 380) : cfg.fromX;
-            p.setPosition(fromX, this.groundY + (cfg.yOffset || 0));
-            p.setVisible(true);
-            p.setFace('idle');
-            p.resetPose();
-            p.animator?.playWalk();
-            p.isArrived = false;
-
-            const dist = Math.abs(effectiveTargetX - fromX);
-            const duration = Math.round((dist / (this.story?.walk_speed || 500)) * 1000) + 300;
-
-            p.entranceTween = this.scene.tweens.add({
-                targets: p,
-                x: effectiveTargetX,
-                duration: duration,
-                ease: 'Power1.easeOut',
-                onComplete: () => {
-                    p.entranceTween = null;
-                    p.isArrived = true;
-                    // Switch to procedural dance idle state with assigned variety
-                    p.animator?.playDance(cfg.danceStyle ? { style: cfg.danceStyle } : {});
-
-                    arrivedCount++;
-                    if (arrivedCount >= totalCrowd) {
-                        onCrowdArrived();
-                    }
-                }
-            });
+        // Immediately go to choice
+        this.scene.time.delayedCall(400, () => {
+            this.goToStep('step_choose_intro');
         });
-
-        if (typeof this.ui.worldContainer.sort === 'function') {
-            this.ui.worldContainer.sort('depth');
-        }
     }
 
     _runStepChooseIntro() {
@@ -585,377 +661,305 @@ export default class StoryController {
                 this.ui.balance.subtract(choice.price);
             }
 
-            if (choice.id === 'choice_business_center' || choice.next === 'step_business_center') {
-                this.goToStep('step_business_center');
-            } else if (choice.id === 'choice_golden_toilet' || choice.next === 'step_golden_toilet') {
-                this.goToStep('step_golden_toilet');
+            if (choice.id === 'choice_lemonade_stand' || choice.next === 'step_lemonade_stand') {
+                this.goToStep('step_lemonade_stand');
+            } else if (choice.id === 'choice_good_business' || choice.next === 'step_good_business') {
+                this.goToStep('step_good_business');
             } else {
                 this.goToStep(choice.next || 'step_walk_to_jewel');
             }
         };
     }
 
-    _runStepBusinessCenter() {
+
+    _runStepLemonadeStand() {
         const hero = this.puppets.hero;
-        const girl1 = this.puppets.girl_1;
-        const friends = [
-            this.puppets.friend1,
-            this.puppets.friend2,
-            this.puppets.friend3,
-            this.puppets.friend4,
-            this.puppets.friend5
-        ];
+        const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5];
 
-        if (this._bcHeadTrackingListener) {
-            this.scene.events.off('update', this._bcHeadTrackingListener);
-            this._bcHeadTrackingListener = null;
-        }
+        const standX = 160;
+        const standY = this.story?.lemonade_stand_y !== undefined ? this.story.lemonade_stand_y : 355;
 
-        // 1. Spawn Business Center
-        const bcCfg = UI_CONFIG?.business_center || {};
-        const bcTex = bcCfg.texture || 'buisnes_center';
-        const bcScale = bcCfg.scale || 0.22;
-        const bcOrigin = bcCfg.origin || { x: 0.5, y: 1.0 };
-        const roadX = this.story?.locations?.road_bg?.x ?? 0;
-        const bcOffsetX = bcCfg.offsetX !== undefined ? bcCfg.offsetX : 115;
-        const buildingX = roadX + bcOffsetX;
-        const buildingY = this.groundY + 40;
-        const doorOffsetX = bcCfg.doorOffsetX !== undefined ? bcCfg.doorOffsetX : -113;
-        const doorX = buildingX + doorOffsetX;
-
-        if (this.building) {
-            this.building.destroy();
-        }
-        if (this._doorTrackingListener) {
-            this.scene.events.off('update', this._doorTrackingListener);
-            this._doorTrackingListener = null;
-        }
-        if (this.doorContainer) {
-            this.doorContainer.destroy();
-            this.doorContainer = null;
-        }
-        if (this.buildingDoorL) { this.buildingDoorL.destroy(); this.buildingDoorL = null; }
-        if (this.buildingDoorR) { this.buildingDoorR.destroy(); this.buildingDoorR = null; }
-
-        this.buildingBaseScale = bcScale;
-
-        this.building = this.scene.add.image(buildingX, buildingY, bcTex);
-        this.building.setOrigin(bcOrigin.x, bcOrigin.y);
+        if (this.building) this.building.destroy();
+        this.building = this.scene.add.image(standX, standY, 'lemonade_stand');
+        this.building.setOrigin(0.5, 1.0);
         this.building.setScale(0);
-        this.building.setDepth(1); // Right after background (depth 0), behind characters (depths 18+)
+        this.building.setDepth(20);
         if (this.ui.worldContainer) {
             this.ui.worldContainer.add(this.building);
-            const houseBg = this.scene.houseBg;
-            const houseBgIndex = houseBg ? this.ui.worldContainer.getIndex(houseBg) : -1;
-            if (houseBgIndex >= 0) {
-                this.ui.worldContainer.moveTo(this.building, houseBgIndex + 1);
-            } else {
-                this.ui.worldContainer.moveTo(this.building, 3);
-            }
-            if (typeof this.ui.worldContainer.sort === 'function') {
-                this.ui.worldContainer.sort('depth');
-            }
+            this.ui.worldContainer.sort('depth');
         }
 
-        // Spawn closed doors immediately so they scale up synchronously with the building
-        this._spawnBuildingDoors(buildingX, buildingY, bcScale);
-
-        // Friends and hero stop dancing to watch the roof appear; girl_1 continues dancing all the time
-        const trackingCharacters = [hero, ...friends].filter(p => !!p);
-        trackingCharacters.forEach(p => {
-            p.animator?.stopAll();
-        });
-        if (hero) {
-            hero.setFace('surprised');
-        }
-        if (girl1 && girl1.animator && !girl1.animator.isDancing) {
-            girl1.animator.playDance({ style: 'girl_turn_dance' });
-        }
-
-        // 1. friend4 and friend3 (and friend5) first move aside to the right
-        const rightFriends = [
-            { puppet: this.puppets.friend3, targetX: 265 },
-            { puppet: this.puppets.friend4, targetX: 345 },
-            { puppet: this.puppets.friend5, targetX: 425 }
-        ];
-        rightFriends.forEach(({ puppet, targetX }) => {
-            if (!puppet) return;
-            puppet.animator?.playWalk();
-            this.scene.tweens.add({
-                targets: puppet,
-                x: targetX,
-                duration: 650,
-                ease: 'Power1.easeOut',
-                onComplete: () => {
-                    puppet.animator?.stopAll();
-                }
-            });
-        });
-
-        // Head and body tracking helper: distributes inclination across both body and head
-        const updateHeadAndBodyTracking = (tx, ty) => {
-            trackingCharacters.forEach(p => {
-                if (!p) return;
-                const headX = p.x;
-                const headY = p.y - 130;
-                const facingSign = Math.sign(p.scaleX || 1);
-                const localDx = Math.max(20, (tx - headX) * facingSign);
-                const localDy = ty - headY;
-                let angle = Math.atan2(localDy, localDx) * (180 / Math.PI);
-                // Halved upward tilt
-                if (angle < 0) {
-                    angle = angle * 0.5;
-                }
-                const totalAngle = Math.max(-36, Math.min(25, angle));
-                const bodyAngle = totalAngle * 0.5;
-                const headAngle = totalAngle * 0.5;
-
-                if (p.bones?.body) {
-                    p.bones.body.angle = bodyAngle;
-                }
-                if (p.bones?.head) {
-                    p.bones.head.angle = headAngle;
-                }
-            });
-        };
-
-        const getRoofPos = () => {
-            if (!this.building) return { roofX: buildingX, roofY: buildingY };
-            const roofX = this.building.x;
-            const h = this.building.height ? (this.building.height * this.building.scaleY) : (this.building.displayHeight || 0);
-            const roofY = this.building.y - h;
-            return { roofX, roofY };
-        };
-
-        // Initially look at where the building sprouts on the ground
-        const initialRoof = getRoofPos();
-        updateHeadAndBodyTracking(initialRoof.roofX, initialRoof.roofY);
-
-        // Frame-by-frame tracker follows the rising roof as it grows into the sky
-        this._bcHeadTrackingListener = () => {
-            const { roofX, roofY } = getRoofPos();
-            updateHeadAndBodyTracking(roofX, roofY);
-        };
-        this.scene.events.on('update', this._bcHeadTrackingListener);
-
-        const bcAppearDur = bcCfg.appearDuration || 1500;
-        const bcAppearEase = bcCfg.appearEase || 'Cubic.easeOut';
-
-        // Plays when the Business Center starts rising from the ground
-        try {
-            Utils.addAudio(this.scene, 'building_grow', 1.0);
-        } catch (e) { }
-
-        // Appearance animation for building (smooth and longer)
+        // 1. Stand pop up
         this.scene.tweens.add({
             targets: this.building,
-            scaleX: bcScale,
-            scaleY: bcScale,
-            duration: bcAppearDur,
-            ease: bcAppearEase,
-            onUpdate: () => {
-                this._syncBuildingDoors();
-            },
+            scale: 0.25,
+            duration: 800,
+            ease: 'Back.easeOut',
             onComplete: () => {
-                this._syncBuildingDoors();
-                if (this._bcHeadTrackingListener) {
-                    this.scene.events.off('update', this._bcHeadTrackingListener);
-                    this._bcHeadTrackingListener = null;
-                }
+                // 2. Hero moves left of the stand, then goes around behind counter on the left
+                if (hero) {
+                    const counterY = 215; // Elevated behind counter (standY: 355 - 140 = 215)
+                    hero.animator?.playWalk();
+                    hero.setDepth(30);
+                    if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
+                    hero.scaleX = -Math.abs(hero.scaleX || 1); // Face left
+                    this.scene.tweens.add({
+                        targets: hero,
+                        x: -60, // Clear the left edge of the bench
+                        y: this.heroGroundY,
+                        duration: 500,
+                        ease: 'Linear',
+                        onComplete: () => {
+                            // Step around the left side to behind the stand
+                            this.scene.tweens.add({
+                                targets: hero,
+                                y: counterY,
+                                duration: 250,
+                                ease: 'Linear',
+                                onComplete: () => {
+                                    hero.setDepth(19); // behind counter
+                                    if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
+                                    hero.scaleX = Math.abs(hero.scaleX || 1); // Face right towards counter
 
-                // Smoothly lower heads and bodies of all characters back to level horizontal posture
-                trackingCharacters.forEach(p => {
-                    if (!p) return;
-                    if (p.bones?.head) {
-                        this.scene.tweens.killTweensOf(p.bones.head);
-                        this.scene.tweens.add({
-                            targets: p.bones.head,
-                            angle: 0,
-                            duration: 300,
-                            ease: 'Sine.easeOut'
-                        });
-                    }
-                    if (p.bones?.body) {
-                        this.scene.tweens.killTweensOf(p.bones.body);
-                        this.scene.tweens.add({
-                            targets: p.bones.body,
-                            angle: 0,
-                            duration: 300,
-                            ease: 'Sine.easeOut'
-                        });
-                    }
-                });
+                                    this.scene.tweens.add({
+                                        targets: hero,
+                                        x: standX,
+                                        duration: 450,
+                                        ease: 'Linear',
+                                        onComplete: () => {
+                                            hero.animator?.stopAll();
+                                            hero.scaleX = Math.abs(hero.scaleX || 1); // Face right again
 
-                // 2. Friends lower heads first, then turn and disperse!
-                this.partyFX?.focusOnGirl(girl1);
+                                            // 3. Shaking stand & rapid arm waving
+                                            this.scene.tweens.add({
+                                                targets: this.building,
+                                                angle: 3,
+                                                duration: 80,
+                                                yoyo: true,
+                                                repeat: 20
+                                            });
 
-                this.scene.time.delayedCall(300, () => {
-                    friends.forEach((friend, idx) => {
-                        if (!friend) return;
-                        friend.animator?.stopAll();
-                        if (friend.bones?.body) {
-                            this.scene.tweens.killTweensOf(friend.bones.body);
-                            friend.bones.body.angle = 0;
-                        }
-                        if (friend.bones?.head) {
-                            this.scene.tweens.killTweensOf(friend.bones.head);
-                            friend.bones.head.angle = 0;
-                        }
+                                            if (hero.bones?.arm_left) {
+                                                this.scene.tweens.add({
+                                                    targets: hero.bones.arm_left,
+                                                    angle: -100,
+                                                    duration: 100,
+                                                    yoyo: true,
+                                                    repeat: 16
+                                                });
+                                            }
+                                            if (hero.bones?.arm_right) {
+                                                this.scene.tweens.add({
+                                                    targets: hero.bones.arm_right,
+                                                    angle: -100,
+                                                    duration: 120,
+                                                    yoyo: true,
+                                                    repeat: 14
+                                                });
+                                            }
 
-                        const isLeft = idx < 2; // friend1, friend2 on left
-                        const exitX = isLeft ? -520 : 580;
-                        const flipSign = isLeft ? -1 : 1;
-                        const friendScale = this._getCharacterScale(friend, flipSign);
-                        friend.setScale(friendScale.x, friendScale.y);
-                        friend.animator?.playWalk();
-                        if (friend.bones?.body) friend.bones.body.angle = 0;
-                        if (friend.bones?.head) friend.bones.head.angle = 0;
+                                            // 4. Coin farming sequence
+                                            const revenue = this.story?.steps?.step_lemonade_stand?.revenue ?? 750000;
+                                            if (this.ui.balance) {
+                                                this.scene.time.delayedCall(500, () => {
+                                                    this.ui.balance.spawnCoinFlyIn(300 + standX, 445, revenue, 10);
+                                                });
+                                            }
 
-                        this.scene.tweens.add({
-                            targets: friend,
-                            x: exitX,
-                            duration: 1100 + idx * 70,
-                            ease: 'Power1.easeIn',
-                            onComplete: () => {
-                                friend.setVisible(false);
-                                friend.animator?.stopAll();
-                            }
-                        });
-                    });
-                });
+                                            // 5. Crowd runs in - distribute widely along X up to screen edge, spread Y, and sort Z-index
+                                            const worldScale = this.ui.worldContainer?.scaleX || 1;
+                                            const containerX = this.ui.worldContainer?.x ?? 300;
+                                            const screenLeftLocal = (0 - containerX) / worldScale;
+                                            const minX = Math.round(screenLeftLocal + 35); // right at the edge of the screen
+                                            const maxX = 30; // before the lemonade stand
+                                            const crowdCenterX = Math.round((minX + maxX) / 2);
 
-                // 3. Hero waits for friends to disperse, then walks to the building doors
-                this.scene.time.delayedCall(1400, () => {
-                    if (hero) {
-                        if (hero.bones?.body) {
-                            this.scene.tweens.killTweensOf(hero.bones.body);
-                            hero.bones.body.angle = 0;
-                        }
-                        if (hero.bones?.head) {
-                            this.scene.tweens.killTweensOf(hero.bones.head);
-                            hero.bones.head.angle = 0;
-                        }
-                        hero.animator?.playWalk();
+                                            let arrivedCount = 0;
+                                            const activeCrowd = friends.filter(c => !!c);
+                                            const count = activeCrowd.length;
 
-                        // Open doors ~400ms before hero arrives
-                        const walkDuration = 650;
-                        this.scene.time.delayedCall(walkDuration - 400, () => {
-                            this._openBuildingDoors();
-                        });
+                                            this._startPartyMusic();
+                                            this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
+                                            this.partyFX.start();
 
-                        this.scene.tweens.add({
-                            targets: hero,
-                            x: doorX,
-                            duration: walkDuration,
-                            ease: 'Power1.easeIn',
-                            onComplete: () => {
-                                hero.setVisible(false);
-                                hero.animator?.stopAll();
+                                            const danceStyles = ['sharp_jumps', 'wave_arms', 'throw_arms', 'step_raise', 'spins'];
+                                            const yLevels = [-26, -13, 0, 13, 26];
+                                            yLevels.sort(() => Math.random() - 0.5);
 
-                                // Close doors behind hero
-                                this._closeBuildingDoors();
+                                            const placements = activeCrowd.map((p, idx) => {
+                                                const stepX = count > 1 ? (maxX - minX) / (count - 1) : 0;
+                                                const jitterX = (Math.random() - 0.5) * 20;
+                                                const targetX = Math.round(minX + idx * stepX + jitterX);
+                                                const yOffset = (yLevels[idx] !== undefined ? yLevels[idx] : 0) + (Math.random() - 0.5) * 6;
+                                                const targetY = Math.round(this.groundY + yOffset);
+                                                return {
+                                                    puppet: p,
+                                                    targetX,
+                                                    targetY
+                                                };
+                                            });
 
-                                // 4. Building Dance: 4-second looping animation (sway left/right with squash/stretch)
-                                try {
-                                    this._factoryWorkSound = Utils.addAudio(this.scene, 'factory_work', 0.8, true);
-                                } catch (e) { }
+                                            // Lower along Y (larger targetY) = higher Z-index (higher depth)
+                                            placements.slice().sort((a, b) => a.targetY - b.targetY).forEach((item, rank) => {
+                                                item.puppet.setDepth(22 + rank);
+                                            });
+                                            if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+                                                this.ui.worldContainer.sort('depth');
+                                            }
 
-                                const swayTween = this.scene.tweens.add({
-                                    targets: this.building,
-                                    angle: 3.2,
-                                    duration: 340,
-                                    yoyo: true,
-                                    repeat: -1,
-                                    ease: 'Sine.easeInOut'
-                                });
+                                            placements.forEach((item, idx) => {
+                                                const p = item.puppet;
+                                                p.setVisible(true);
+                                                const pScale = this._getCharacterScale(p, 1);
+                                                p.setScale(pScale.x, pScale.y);
+                                                p.animator?.playWalk();
+                                                const fromX = -450 - (idx * 80);
+                                                p.setPosition(fromX, item.targetY);
 
-                                const squashTween = this.scene.tweens.add({
-                                    targets: this.building,
-                                    scaleY: bcScale * 1.04,
-                                    scaleX: bcScale * 0.97,
-                                    duration: 240,
-                                    yoyo: true,
-                                    repeat: -1,
-                                    ease: 'Sine.easeInOut'
-                                });
+                                                this.scene.tweens.add({
+                                                    targets: p,
+                                                    x: item.targetX,
+                                                    duration: 1200 + idx * 100,
+                                                    ease: 'Power1.easeOut',
+                                                    onComplete: () => {
+                                                        const style = danceStyles[idx % danceStyles.length];
+                                                        p.animator?.playDance({ style });
+                                                        arrivedCount++;
+                                                        if (arrivedCount === activeCrowd.length) {
+                                                            // Friends are dancing, Hero exits to join the crowd
+                                                            this.scene.time.delayedCall(1500, () => {
+                                                                // Exit sequence: walk left of stand, weave down Y and across X with increasing Z-index into center of crowd
+                                                                const counterY = 215;
+                                                                hero.animator?.playWalk();
+                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
 
-                                // Sparkles appear on girl 2 seconds earlier than when hero exits
-                                this.scene.time.delayedCall(2000, () => {
-                                    this.partyFX?.sparkleOnGirl(girl1);
-                                });
+                                                                // 1. Move to the left of the lemonade stand behind counter (clearing the bench edge)
+                                                                this.scene.tweens.add({
+                                                                    targets: hero,
+                                                                    x: -60,
+                                                                    y: counterY,
+                                                                    duration: 450,
+                                                                    ease: 'Linear',
+                                                                    onComplete: () => {
+                                                                        // Pass 1: to the right & down Y
+                                                                        hero.scaleX = Math.abs(hero.scaleX || 1);
+                                                                        hero.setDepth(23);
+                                                                        if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
 
-                                // Coins fly out of the business center door and arc to the balance UI (+700 000 awarded)
-                                // Building door in mainContainer space: worldContainer is at (300, 450), building at buildingX in world space
-                                if (this.ui.balance) {
-                                    const doorMainX = 300 + doorX;
-                                    const doorMainY = 445;
-                                    // 3 waves staggered; only the last wave triggers the business center revenue (+700 000)
-                                    const waveDelays = [550, 1350, 2200];
-                                    const waveCoins = [5, 5, 5];
-                                    const bcRevenue = this.scene?.SETTINGS?.economy?.business_center_revenue
-                                        ?? this.story?.steps?.step_business_center?.revenue
-                                        ?? 700000;
-                                    waveDelays.forEach((waveDelay, wi) => {
-                                        this.scene.time.delayedCall(waveDelay, () => {
-                                            const isLastWave = wi === waveDelays.length - 1;
-                                            this.ui.balance.spawnCoinFlyIn(
-                                                doorMainX,
-                                                doorMainY,
-                                                isLastWave ? bcRevenue : 0,
-                                                waveCoins[wi]
-                                            );
-                                        });
+                                                                        this.scene.tweens.add({
+                                                                            targets: hero,
+                                                                            x: 0,
+                                                                            y: this.groundY,
+                                                                            duration: 320,
+                                                                            ease: 'Linear',
+                                                                            onComplete: () => {
+                                                                                // Pass 2: to the left & down Y
+                                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
+                                                                                hero.setDepth(25);
+                                                                                if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
+
+                                                                                this.scene.tweens.add({
+                                                                                    targets: hero,
+                                                                                    x: -80,
+                                                                                    y: this.groundY + 15,
+                                                                                    duration: 380,
+                                                                                    ease: 'Linear',
+                                                                                    onComplete: () => {
+                                                                                        // Pass 3: to the right & down Y
+                                                                                        hero.scaleX = Math.abs(hero.scaleX || 1);
+                                                                                        hero.setDepth(27);
+                                                                                        if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
+
+                                                                                        this.scene.tweens.add({
+                                                                                            targets: hero,
+                                                                                            x: -40,
+                                                                                            y: this.groundY + 28,
+                                                                                            duration: 300,
+                                                                                            ease: 'Linear',
+                                                                                            onComplete: () => {
+                                                                                                // Pass 4: to the left into crowd center in foreground
+                                                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
+                                                                                                hero.setDepth(30);
+                                                                                                if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
+
+                                                                                                this.scene.tweens.add({
+                                                                                                    targets: hero,
+                                                                                                    x: crowdCenterX,
+                                                                                                    y: this.groundY + 38,
+                                                                                                    duration: 480,
+                                                                                                    ease: 'Power1.easeOut',
+                                                                                                    onComplete: () => {
+                                                                                                        hero.scaleX = Math.abs(hero.scaleX || 1);
+                                                                                                        hero.animator?.playIdle();
+                                                                                                        hero.setFace('happy');
+
+                                                                                                        // Sequence Man 1 (realtor) entrance from the right before displaying House choice
+                                                                                                        const man1 = this.puppets.man_1;
+                                                                                                        if (man1) {
+                                                                                                            const worldScale = this.ui.worldContainer?.scaleX || 1;
+                                                                                                            const containerX = this.ui.worldContainer?.x ?? 300;
+                                                                                                            const screenRightLocal = (this.scene.scale.width - containerX) / worldScale;
+                                                                                                            const fromX = Math.max(Math.round(screenRightLocal + 120), 460);
+                                                                                                            const manTargetX = 240;
+
+                                                                                                            man1.setPosition(fromX, this.groundY);
+                                                                                                            const manScale = this._getCharacterScale(man1, -1);
+                                                                                                            man1.setScale(manScale.x, manScale.y);
+                                                                                                            man1.setVisible(true);
+                                                                                                            man1.resetPose();
+                                                                                                            man1.setDepth(24);
+                                                                                                            if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+                                                                                                                this.ui.worldContainer.sort('depth');
+                                                                                                            }
+                                                                                                            man1.animator?.playWalk({ speed: 0.55 });
+
+                                                                                                            this.scene.tweens.add({
+                                                                                                                targets: man1,
+                                                                                                                x: manTargetX,
+                                                                                                                duration: 2000,
+                                                                                                                ease: 'Power1.easeOut',
+                                                                                                                onComplete: () => {
+                                                                                                                    man1.animator?.playIdle();
+                                                                                                                    try {
+                                                                                                                        Utils.addAudio(this.scene, 'voice_man_mumble', 1.0);
+                                                                                                                    } catch (e) { }
+
+                                                                                                                    // Display House choice cards ONLY after Man 1 reaches final idle position
+                                                                                                                    this.scene.time.delayedCall(400, () => {
+                                                                                                                        this.goToStep('step_choose_house');
+                                                                                                                    });
+                                                                                                                }
+                                                                                                            });
+                                                                                                        } else {
+                                                                                                            this.scene.time.delayedCall(400, () => {
+                                                                                                                this.goToStep('step_choose_house');
+                                                                                                            });
+                                                                                                        }
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+                                                                                        });
+                                                                                    }
+                                                                                });
+                                                                            }
+                                                                        });
+                                                                    }
+                                                                });
+                                                            });
+                                                        }
+                                                    }
+                                                });
+                                            });
+                                        }
                                     });
                                 }
-
-                                // 5. Transition: After 4 seconds, hero emerges from building
-                                this.scene.time.delayedCall(4000, () => {
-                                    if (this._factoryWorkSound) {
-                                        this._factoryWorkSound.stop();
-                                        this._factoryWorkSound = null;
-                                    }
-                                    swayTween.stop();
-                                    squashTween.stop();
-                                    if (this.building) {
-                                        this.building.angle = 0;
-                                        this.building.setScale(bcScale);
-                                        this._syncBuildingDoors();
-                                    }
-
-                                    // Hero leaves work: fade beams & strobe
-                                    this.partyFX?.finishParty(girl1);
-
-                                    // Open doors, then show hero, then close doors behind him
-                                    this._openBuildingDoors(300, () => {
-                                        if (hero) {
-                                            hero.setPosition(doorX, this.heroGroundY);
-                                            hero.setVisible(true);
-                                            const heroScale = this._getCharacterScale(hero, 1);
-                                            hero.setScale(heroScale.x, heroScale.y);
-                                            hero.setFace('happy');
-                                            hero.animator?.playIdle();
-                                        }
-
-                                        // Close doors behind the emerging hero after a short beat
-                                        this.scene.time.delayedCall(600, () => {
-                                            this._closeBuildingDoors();
-                                        });
-
-                                        this.scene.time.delayedCall(1000, () => {
-                                            this.goToStep('step_walk_to_jewel');
-                                        });
-                                    });
-                                });
-                            }
-                        });
-                    } else {
-                        this.goToStep('step_walk_to_jewel');
-                    }
-                });
+                            });
+                        }
+                    });
+                }
             }
         });
     }
-
     _spawnBuildingDoors(buildingX, buildingY, bcScale = 0.22) {
         if (this._doorTrackingListener) {
             this.scene.events.off('update', this._doorTrackingListener);
@@ -1103,431 +1107,276 @@ export default class StoryController {
         });
     }
 
-    _stopToiletShake() {
-        if (this._toiletRumbleSound) {
-            this._toiletRumbleSound.stop();
-            this._toiletRumbleSound = null;
-        }
-        if (this._toiletShakeListener) {
-            this.scene?.events?.off('update', this._toiletShakeListener);
-            this._toiletShakeListener = null;
-        }
-        const roadX = this.story?.locations?.road_bg?.x ?? 0;
-        const gtCfg = UI_CONFIG?.golden_toilet || {};
-        const toiletOffsetX = gtCfg.offsetX !== undefined ? gtCfg.offsetX : 175;
-        const baseToiletX = roadX + toiletOffsetX;
-        const baseToiletY = this.groundY + 77;
-        const baseHeroX = baseToiletX - 25;
-        const baseHeroY = baseToiletY - 105;
 
-        if (this.toiletContainer && this.toiletContainer.active) {
-            this.toiletContainer.setPosition(baseToiletX, baseToiletY);
-            this.toiletContainer.angle = 0;
-        }
-        const hero = this.puppets?.hero;
-        if (hero && hero.active && this._heroSeatedOnToilet) {
-            hero.setPosition(baseHeroX, baseHeroY);
-            hero.angle = 0;
-        }
-    }
-
-    _startToiletShake(startTime, duration) {
-        this._stopToiletShake();
-
-        if (!this._toiletRumbleSound) {
-            try {
-                this._toiletRumbleSound = Utils.addAudio(this.scene, 'toilet_rumble', 0.85, true);
-            } catch (e) { }
+    _playSmokeTransformation(hero, onCovered, onComplete) {
+        if (!hero) {
+            if (typeof onCovered === 'function') onCovered();
+            if (typeof onComplete === 'function') onComplete();
+            return;
         }
 
-        const gtCfg = UI_CONFIG?.golden_toilet || {};
-        const toiletOffsetX = gtCfg.offsetX !== undefined ? gtCfg.offsetX : 175;
+        const scene = this.scene;
 
-        const shakeListener = () => {
-            if (!this.scene) return;
-            const now = this.scene.time.now;
-            const elapsed = now - startTime;
-            if (elapsed < 0) return;
-
-            const roadX = this.story?.locations?.road_bg?.x ?? 0;
-            const baseToiletX = roadX + toiletOffsetX;
-            const baseToiletY = this.groundY + 77;
-            const baseHeroX = baseToiletX - 25;
-            const baseHeroY = baseToiletY - 105;
-
-            if (elapsed >= duration) {
-                this._stopToiletShake();
-                return;
+        // Ensure soft radial smoke texture exists
+        const texKey = 'suit_smoke_puff';
+        if (!scene.textures.exists(texKey)) {
+            const size = 128;
+            const canvas = scene.textures.createCanvas(texKey, size, size);
+            if (canvas) {
+                const ctx = canvas.context;
+                const center = size / 2;
+                const grad = ctx.createRadialGradient(center, center, 0, center, center, center);
+                grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+                grad.addColorStop(0.35, 'rgba(240, 245, 255, 0.95)');
+                grad.addColorStop(0.70, 'rgba(220, 235, 255, 0.5)');
+                grad.addColorStop(1.0, 'rgba(200, 220, 250, 0.0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(center, center, center, 0, Math.PI * 2);
+                ctx.fill();
+                canvas.refresh();
             }
-
-            // Progress 0 to 1 over duration (2600ms)
-            const progress = elapsed / duration;
-
-            // Envelope: smooth bell-shaped arc (starts at 0, increases to peak in middle, decreases to 0 at end)
-            const envelope = Math.pow(Math.sin(progress * Math.PI), 1.2);
-
-            // Multi-frequency noise for uneven, organic shaking
-            const maxShakeX = 8.5;
-            const maxShakeY = 5.5;
-            const maxAngle = 3.2;
-
-            const freq1 = Math.sin(elapsed * 0.047);
-            const freq2 = Math.cos(elapsed * 0.083);
-            const freq3 = Math.sin(elapsed * 0.139);
-
-            const spikeX = (Math.random() - 0.5) * 1.8;
-            const spikeY = (Math.random() - 0.5) * 1.8;
-            const spikeAngle = (Math.random() - 0.5) * 1.5;
-
-            const offsetX = (freq1 * 0.5 + freq2 * 0.3 + freq3 * 0.2 + spikeX) * maxShakeX * envelope;
-            const offsetY = (freq2 * 0.5 + freq3 * 0.3 + spikeY) * maxShakeY * envelope;
-            const angleOffset = (freq1 * 0.5 + spikeAngle) * maxAngle * envelope;
-
-            if (this.toiletContainer && this.toiletContainer.active) {
-                this.toiletContainer.setPosition(baseToiletX + offsetX, baseToiletY + offsetY);
-                this.toiletContainer.angle = angleOffset;
-            }
-
-            const hero = this.puppets?.hero;
-            if (hero && hero.active && this._heroSeatedOnToilet) {
-                hero.setPosition(baseHeroX + offsetX, baseHeroY + offsetY);
-                hero.angle = angleOffset;
-            }
-        };
-
-        this._toiletShakeListener = shakeListener;
-        this.scene.events.on('update', shakeListener);
-    }
-
-    _runStepGoldenToilet() {
-        this._stopToiletShake();
-        const hero = this.puppets.hero;
-        const friends = [
-            this.puppets.friend1,
-            this.puppets.friend2,
-            this.puppets.friend3,
-            this.puppets.friend4,
-            this.puppets.friend5
-        ];
-
-        // 1. Spawn Golden Toilet (bottom + top) slightly to the right and lower
-        const gtCfg = UI_CONFIG?.golden_toilet || {};
-        const bottomCfg = gtCfg.bottom || { texture: 'golden_toilet_bottom', scale: 0.44, origin: { x: 0.5, y: 1.0 } };
-        const topCfg = gtCfg.top || { texture: 'golden_toilet_top', scale: 0.44, origin: { x: 0.673, y: 0.510 } };
-        const girl1 = this.puppets.girl_1;
-        const roadX = this.story?.locations?.road_bg?.x ?? 0;
-        const toiletOffsetX = gtCfg.offsetX !== undefined ? gtCfg.offsetX : 175;
-        const toiletX = roadX + toiletOffsetX;
-        const landingY = this.groundY + 77;
-        const skyY = this.groundY - 580;
-        this._toiletLanded = false;
-        this._heroSeatedOnToilet = false;
-
-        if (this.toiletContainer) {
-            this.toiletContainer.destroy();
         }
 
-        // Toilet spawns up in the sky with scale 0
-        this.toiletContainer = this.scene.add.container(toiletX, skyY);
-        // Toilet is in front of the other characters (depths 18-21), but behind hero (depth 30)
-        this.toiletContainer.setDepth(25);
-        this.toiletContainer.setScale(0);
+        const smokeContainer = scene.add.container(hero.x, hero.y);
+        smokeContainer.setDepth((hero.depth || 30) + 15);
         if (this.ui.worldContainer) {
-            this.ui.worldContainer.add(this.toiletContainer);
-            // Reorder: bring toilet in front of crowd characters, and keep hero above toilet
-            this.ui.worldContainer.bringToTop(this.toiletContainer);
-            if (hero) {
-                this.ui.worldContainer.bringToTop(hero);
-            }
+            this.ui.worldContainer.add(smokeContainer);
             if (typeof this.ui.worldContainer.sort === 'function') {
                 this.ui.worldContainer.sort('depth');
             }
         }
 
-        const toiletBottom = this.scene.add.image(0, 0, bottomCfg.texture);
-        toiletBottom.setOrigin(bottomCfg.origin.x, bottomCfg.origin.y);
-        toiletBottom.setScale(bottomCfg.scale);
-        this.toiletContainer.add(toiletBottom);
+        const puffCount = 26;
+        const puffs = [];
 
-        // Hinge position for top lid
-        const bottomW = 419 * bottomCfg.scale;
-        const bottomH = 490 * bottomCfg.scale;
-        const hingeRelX = -bottomW * 0.5 + (282 * bottomCfg.scale);
-        const hingeRelY = -bottomH + (250 * bottomCfg.scale);
+        for (let i = 0; i < puffCount; i++) {
+            const startX = (Math.random() - 0.5) * 70;
+            const startY = -150 - Math.random() * 80; // falling from above the hero
+            const targetX = (Math.random() - 0.5) * 85;
+            const targetY = -60 + Math.random() * 95; // covering head, torso, legs
 
-        const toiletTop = this.scene.add.image(hingeRelX, hingeRelY, topCfg.texture);
-        toiletTop.setOrigin(topCfg.origin.x, topCfg.origin.y);
-        toiletTop.setScale(topCfg.scale);
-        toiletTop.setDepth(16);
-        toiletTop.angle = 0;
-        this.toiletContainer.add(toiletTop);
+            const puff = scene.add.image(startX, startY, texKey);
+            const targetScale = 1.35 + Math.random() * 0.55; // 170px to 240px wide puff size
+            puff.setScale(0.5);
+            puff.setAlpha(0);
+            puff.setTint(Math.random() > 0.4 ? 0xffffff : 0xecf3fc);
+            smokeContainer.add(puff);
+            puffs.push({ puff, targetX, targetY, targetScale });
+        }
 
-        // 1. Friends and hero stop dancing and look up into the sky; girl_1 continues dancing all the time
-        const trackingCharacters = [hero, ...friends].filter(p => !!p);
-        trackingCharacters.forEach(p => {
-            p.animator?.stopAll();
+        // 1. Fall down from above and envelope the entire Hero completely
+        puffs.forEach((p) => {
+            const delay = Math.random() * 80;
+            scene.tweens.add({
+                targets: p.puff,
+                x: p.targetX,
+                y: p.targetY,
+                scaleX: p.targetScale,
+                scaleY: p.targetScale,
+                alpha: 0.96,
+                duration: 400 + Math.random() * 80,
+                delay: delay,
+                ease: 'Quad.easeIn'
+            });
         });
-        if (hero) {
-            hero.setFace('surprised');
-        }
-        // Ensure girl1 continues dancing without interruption
-        if (girl1 && girl1.animator && !girl1.animator.isDancing) {
-            girl1.animator.playDance({ style: 'girl_turn_dance' });
-        }
 
-        // Head and body tracking helper: distributes inclination across both body and head
-        const updateHeadTracking = (tx, ty) => {
-            trackingCharacters.forEach(p => {
-                if (!p) return;
-                const headX = p.x;
-                const headY = p.y - 130;
-                const facingSign = Math.sign(p.scaleX || 1);
-                const localDx = Math.max(20, (tx - headX) * facingSign);
-                const localDy = ty - headY;
-                let angle = Math.atan2(localDy, localDx) * (180 / Math.PI);
-                // Halved upward tilt
-                if (angle < 0) {
-                    angle = angle * 0.5;
-                }
-                const totalAngle = Math.max(-36, Math.min(25, angle));
-                const bodyAngle = totalAngle * 0.5;
-                const headAngle = totalAngle * 0.5;
+        // 2. Skin swap while completely enveloped in smoke
+        scene.time.delayedCall(480, () => {
+            if (typeof onCovered === 'function') {
+                onCovered();
+            }
 
-                if (p.bones?.body) {
-                    p.bones.body.angle = bodyAngle;
-                }
-                if (p.bones?.head) {
-                    p.bones.head.angle = headAngle;
+            // 3. Smooth dissipation once new outfit is applied
+            puffs.forEach(p => {
+                scene.tweens.add({
+                    targets: p.puff,
+                    y: p.targetY - 35 - Math.random() * 40,
+                    x: p.targetX + (Math.random() - 0.5) * 50,
+                    scaleX: p.targetScale * 1.25,
+                    scaleY: p.targetScale * 1.25,
+                    alpha: 0,
+                    duration: 520 + Math.random() * 120,
+                    ease: 'Power2.easeOut'
+                });
+            });
+
+            scene.time.delayedCall(620, () => {
+                smokeContainer.destroy();
+                if (typeof onComplete === 'function') {
+                    onComplete();
                 }
             });
-        };
+        });
+    }
 
-        // Smoothly tilt both body and head upwards towards the sky
-        trackingCharacters.forEach(p => {
-            if (!p) return;
-            const headX = p.x;
-            const headY = p.y - 130;
-            const facingSign = Math.sign(p.scaleX || 1);
-            const localDx = Math.max(20, (toiletX - headX) * facingSign);
-            const localDy = skyY - headY;
-            const rawAngle = Math.atan2(localDy, localDx) * (180 / Math.PI);
-            const upwardAngle = rawAngle < 0 ? rawAngle * 0.5 : rawAngle;
-            const totalAngle = Math.max(-36, Math.min(25, upwardAngle));
-            const targetBodyAngle = totalAngle * 0.5;
-            const targetHeadAngle = totalAngle * 0.5;
+    _runStepGoodBusiness() {
+        const hero = this.puppets.hero;
+        const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5];
 
-            if (p.bones?.body) {
-                this.scene.tweens.add({
-                    targets: p.bones.body,
-                    angle: targetBodyAngle,
-                    duration: 320,
-                    ease: 'Sine.easeOut'
-                });
-            }
-            if (p.bones?.head) {
-                this.scene.tweens.add({
-                    targets: p.bones.head,
-                    angle: targetHeadAngle,
-                    duration: 320,
-                    ease: 'Sine.easeOut'
-                });
-            }
+        // 1. Hero stays in-place at current position during transformation
+        if (hero) {
+            hero.animator?.playIdle();
+            hero.setFace('idle');
+        }
+
+        // 2. Start Party Music and Party FX (spotlight rays, darkening overlay)
+        this._startPartyMusic();
+        this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
+        this.partyFX.start();
+
+        // 3. Crowd runs in from the left and begins disco dancing
+        const worldScale = this.ui.worldContainer?.scaleX || 1;
+        const containerX = this.ui.worldContainer?.x ?? 300;
+        const screenLeftLocal = (0 - containerX) / worldScale;
+        const minX = Math.round(screenLeftLocal + 35);
+        const maxX = 30;
+        const crowdCenterX = Math.round((minX + maxX) / 2);
+
+        let arrivedCount = 0;
+        const activeCrowd = friends.filter(c => !!c);
+        const count = activeCrowd.length;
+
+        const danceStyles = ['sharp_jumps', 'wave_arms', 'throw_arms', 'step_raise', 'spins'];
+        const yLevels = [-26, -13, 0, 13, 26];
+        yLevels.sort(() => Math.random() - 0.5);
+
+        const placements = activeCrowd.map((p, idx) => {
+            const stepX = count > 1 ? (maxX - minX) / (count - 1) : 0;
+            const jitterX = (Math.random() - 0.5) * 20;
+            const targetX = Math.round(minX + idx * stepX + jitterX);
+            const yOffset = (yLevels[idx] !== undefined ? yLevels[idx] : 0) + (Math.random() - 0.5) * 6;
+            const targetY = Math.round(this.groundY + yOffset);
+            return {
+                puppet: p,
+                targetX,
+                targetY
+            };
         });
 
-        // 2. friend4 and friend3 (and friend5) move to the right to clear the drop zone
-        const rightFriends = [
-            { puppet: this.puppets.friend3, targetX: 265 },
-            { puppet: this.puppets.friend4, targetX: 345 },
-            { puppet: this.puppets.friend5, targetX: 425 }
-        ];
-        rightFriends.forEach(({ puppet, targetX }) => {
-            if (!puppet) return;
-            puppet.animator?.playWalk();
+        // Lower along Y (larger targetY) = higher Z-index
+        placements.slice().sort((a, b) => a.targetY - b.targetY).forEach((item, rank) => {
+            item.puppet.setDepth(22 + rank);
+        });
+        if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+            this.ui.worldContainer.sort('depth');
+        }
+
+        placements.forEach((item, idx) => {
+            const p = item.puppet;
+            p.setVisible(true);
+            const pScale = this._getCharacterScale(p, 1);
+            p.setScale(pScale.x, pScale.y);
+            p.animator?.playWalk();
+            const fromX = -450 - (idx * 80);
+            p.setPosition(fromX, item.targetY);
+
             this.scene.tweens.add({
-                targets: puppet,
-                x: targetX,
-                duration: 650,
+                targets: p,
+                x: item.targetX,
+                duration: 1200 + idx * 100,
                 ease: 'Power1.easeOut',
                 onComplete: () => {
-                    puppet.animator?.stopAll();
+                    const style = danceStyles[idx % danceStyles.length];
+                    p.animator?.playDance({ style });
+                    arrivedCount++;
                 }
             });
         });
 
-        // 3. Toilet appears high up in the sky
-        this.scene.time.delayedCall(120, () => {
-            this.scene.tweens.add({
-                targets: this.toiletContainer,
-                scaleX: 1,
-                scaleY: 1,
-                duration: 360,
-                ease: 'Back.easeOut'
-            });
-        });
-
-        // 4. Toilet falls to the landing spot, and all friends watch it with their heads as it falls
-        this.scene.time.delayedCall(520, () => {
-            this._toiletHeadTrackingListener = () => {
-                if (this.toiletContainer) {
-                    updateHeadTracking(this.toiletContainer.x, this.toiletContainer.y);
+        // 4. In-place Smoke Transformation for Hero
+        this._playSmokeTransformation(
+            hero,
+            // onCovered: Swap skins while completely covered by the smoke cloud
+            () => {
+                if (hero) {
+                    hero.setAttachment('head', 'hero_head_prestige');
+                    hero.setAttachment('hair', 'hero_hair_prestige');
+                    hero.setAttachment('body', 'hero_body_prestige');
+                    hero.setAttachment('arm_left', 'hero_arm_l_prestige');
+                    hero.setAttachment('arm_right', 'hero_arm_r_prestige');
+                    hero.setAttachment('leg_left', 'hero_leg_l_prestige');
+                    hero.setAttachment('leg_right', 'hero_leg_r_prestige');
+                    hero.setAttachment('foot_left', 'hero_foot_prestige_l');
+                    hero.setAttachment('foot_right', 'hero_foot_prestige_r');
+                    hero.setFace('happy');
                 }
-            };
-            this.scene.events.on('update', this._toiletHeadTrackingListener);
-
-            try {
-                Utils.addAudio(this.scene, 'fall_whistle', 1.0);
-            } catch (e) { }
-
-            this.scene.tweens.add({
-                targets: this.toiletContainer,
-                y: landingY,
-                duration: 720,
-                ease: 'Quad.easeIn',
-                onComplete: () => {
-                    this._toiletLanded = true;
-                    try {
-                        Utils.addAudio(this.scene, 'gold_impact', 1.0);
-                    } catch (e) { }
-                    // Stop frame-by-frame tracking listener once landed
-                    if (this._toiletHeadTrackingListener) {
-                        this.scene.events.off('update', this._toiletHeadTrackingListener);
-                        this._toiletHeadTrackingListener = null;
+                try {
+                    Utils.addAudio(this.scene, 'magic_sparkle', 1.0);
+                } catch (e) { }
+            },
+            // onComplete: Smoke has smoothly dissipated
+            () => {
+                // 5. Join the crowd: tween Hero leftward into the group of friends
+                if (hero) {
+                    hero.scaleX = -Math.abs(hero.scaleX || 1); // Face left while walking
+                    hero.animator?.playWalk();
+                    hero.setDepth(30);
+                    if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+                        this.ui.worldContainer.sort('depth');
                     }
-                    // Settle gaze directly onto the landed toilet
-                    updateHeadTracking(toiletX, landingY);
 
-                    // Impact squash and bounce
                     this.scene.tweens.add({
-                        targets: this.toiletContainer,
-                        scaleY: 0.86,
-                        scaleX: 1.14,
-                        duration: 80,
-                        yoyo: true,
-                        ease: 'Quad.easeOut'
-                    });
+                        targets: hero,
+                        x: crowdCenterX,
+                        y: this.groundY + 38,
+                        duration: 650,
+                        ease: 'Power1.easeInOut',
+                        onComplete: () => {
+                            // After reaching position within group, Hero faces right (toward upcoming visitor)
+                            hero.scaleX = Math.abs(hero.scaleX || 1);
+                            hero.animator?.playIdle();
+                            hero.setFace('happy');
 
-                    // Subtle camera shake on heavy impact
-                    this.scene.cameras.main.shake(160, 0.005);
+                            // 6. Sequence Man 1 (realtor) entrance from the right edge
+                            const man1 = this.puppets.man_1;
+                            if (man1) {
+                                const screenRightLocal = (this.scene.scale.width - containerX) / worldScale;
+                                const fromX = Math.max(Math.round(screenRightLocal + 120), 460);
+                                const manTargetX = 220;
 
-                    // Hinge the lid open
-                    this.scene.tweens.add({
-                        targets: toiletTop,
-                        angle: 75,
-                        duration: 450,
-                        ease: 'Back.easeOut'
-                    });
-
-                    // 5. Hero walks to the toilet and adjusts pose/position to "sit" on it
-                    this.scene.time.delayedCall(350, () => {
-                        if (hero) {
-                            // Ensure hero is higher in Z-index than the toilet
-                            hero.setDepth(30);
-                            if (this.ui.worldContainer) {
-                                this.ui.worldContainer.bringToTop(hero);
-                                if (typeof this.ui.worldContainer.sort === 'function') {
+                                man1.setPosition(fromX, this.groundY);
+                                const manScale = this._getCharacterScale(man1, -1);
+                                man1.setScale(manScale.x, manScale.y);
+                                man1.setVisible(true);
+                                man1.resetPose();
+                                man1.setDepth(24);
+                                if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
                                     this.ui.worldContainer.sort('depth');
                                 }
-                            }
-                            if (hero.bones?.body) hero.bones.body.angle = 0;
-                            if (hero.bones?.head) hero.bones.head.angle = 0;
-                            hero.animator?.playWalk();
-                            this.scene.tweens.add({
-                                targets: hero,
-                                x: toiletX - 25,
-                                duration: 650,
-                                ease: 'Power1.easeIn',
-                                onComplete: () => {
-                                    hero.animator?.stopAll();
-                                    this._heroSeatedOnToilet = true;
-                                    // Turn hero around to sit facing left
-                                    const sitScale = this._getCharacterScale(hero, -1);
-                                    hero.setScale(sitScale.x, sitScale.y);
-                                    // Seat position is at toiletX - 25 horizontally, and at the bowl seat vertically
-                                    hero.setPosition(toiletX - 25, landingY - 105);
-                                    hero.setDepth(30);
-                                    if (this.ui.worldContainer) {
-                                        this.ui.worldContainer.bringToTop(hero);
-                                        if (typeof this.ui.worldContainer.sort === 'function') {
-                                            this.ui.worldContainer.sort('depth');
-                                        }
+                                man1.animator?.playWalk({ speed: 0.55 });
+
+                                this.scene.tweens.add({
+                                    targets: man1,
+                                    x: manTargetX,
+                                    duration: 2000,
+                                    ease: 'Power1.easeOut',
+                                    onComplete: () => {
+                                        man1.animator?.playIdle();
+                                        try {
+                                            Utils.addAudio(this.scene, 'voice_man_mumble', 1.0);
+                                        } catch (e) { }
+
+                                        // Display House choice cards ONLY after Man 1 reaches destination
+                                        this.scene.time.delayedCall(400, () => {
+                                            this.goToStep('step_choose_house');
+                                        });
                                     }
-                                    if (hero.bones?.leg_upper_left) hero.bones.leg_upper_left.angle = -82;
-                                    if (hero.bones?.leg_upper_right) hero.bones.leg_upper_right.angle = -82;
-                                    if (hero.bones?.arm_left) hero.bones.arm_left.angle = -20;
-                                    if (hero.bones?.arm_right) hero.bones.arm_right.angle = -20;
-                                    if (hero.bones?.body) hero.bones.body.angle = 0;
-                                    if (hero.bones?.head) hero.bones.head.angle = 0;
-                                    hero.setFace('happy');
-
-                                    // Start uneven toilet shaking 500ms after sitting down (duration 2600ms, stops 500ms before standing up at 3600ms)
-                                    this.scene.time.delayedCall(500, () => {
-                                        if (this._heroSeatedOnToilet) {
-                                            this._startToiletShake(this.scene.time.now, 2600);
-                                        }
-                                    });
-
-                                    // 6. Simultaneously, all 5 friends walk back off-screen and disappear. girl_1 remains in her spot.
-                                    const girl1 = this.puppets.girl_1;
-                                    this.partyFX?.focusOnGirl(girl1);
-
-                                    // Sparkles appear and disappear 2 seconds earlier than when hero stands up (at 1600ms instead of 3600ms)
-                                    this.scene.time.delayedCall(1600, () => {
-                                        this.partyFX?.sparkleOnGirl(girl1);
-                                    });
-
-                                    friends.forEach((friend, idx) => {
-                                        if (!friend) return;
-                                        friend.animator?.stopAll();
-
-                                        const isLeft = idx < 2;
-                                        const exitX = isLeft ? -520 : 580;
-                                        const flipSign = isLeft ? -1 : 1;
-                                        const friendScale = this._getCharacterScale(friend, flipSign);
-                                        friend.setScale(friendScale.x, friendScale.y);
-                                        if (friend.bones?.body) friend.bones.body.angle = 0;
-                                        if (friend.bones?.head) friend.bones.head.angle = 0;
-                                        friend.animator?.playWalk();
-
-                                        this.scene.tweens.add({
-                                            targets: friend,
-                                            x: exitX,
-                                            duration: 1300 + idx * 80,
-                                            ease: 'Power1.easeIn',
-                                            onComplete: () => {
-                                                friend.setVisible(false);
-                                                friend.animator?.stopAll();
-                                            }
-                                        });
-                                    });
-
-                                    // 4. Transition: Hero stands up, then hero and girl_1 walk to right
-                                    this.scene.time.delayedCall(3600, () => {
-                                        this._stopToiletShake();
-                                        this._heroSeatedOnToilet = false;
-                                        // Hero gets up from toilet: fade beams & strobe
-                                        this.partyFX?.finishParty(girl1);
-
-                                        if (hero) {
-                                            hero.resetPose();
-                                            hero.y = this.heroGroundY;
-                                            const heroScale = this._getCharacterScale(hero, 1);
-                                            hero.setScale(heroScale.x, heroScale.y);
-                                            hero.animator?.playIdle();
-                                        }
-
-                                        this.scene.time.delayedCall(1000, () => {
-                                            this.goToStep('step_walk_to_jewel');
-                                        });
-                                    });
-                                }
-                            });
-                        } else {
-                            this.goToStep('step_walk_to_jewel');
+                                });
+                            } else {
+                                this.scene.time.delayedCall(400, () => {
+                                    this.goToStep('step_choose_house');
+                                });
+                            }
                         }
                     });
+                } else {
+                    this.scene.time.delayedCall(400, () => {
+                        this.goToStep('step_choose_house');
+                    });
                 }
-            });
-        });
+            }
+        );
     }
 
     _runStepWalkToJewel() {
@@ -1800,38 +1649,42 @@ export default class StoryController {
 
             this.chosenHouse = choice.id;
 
+            // Fade out party visual effects and stop party music smoothly when camera pan begins
+            if (this.partyFX) {
+                this.partyFX.finishParty();
+            }
+            this._stopPartyMusic();
+
             // Set house background according to selection
             if (typeof this.ui.setHouseBackground === 'function') {
                 this.ui.setHouseBackground(choice.id);
             }
 
             const hero = this.puppets.hero;
-            const girl1 = this.puppets.girl_1;
-            const startX = this.story?.locations?.jewel_building_bg?.x ?? (this.story?.locations?.road_bg?.displayWidth || 1544);
-            const targetHouseX = this.story?.locations?.luxury_house_bg?.x ?? ((this.story?.locations?.road_bg?.displayWidth || 1544) * 2);
-            const spacing = 185;
+            const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5].filter(c => !!c);
+            const startX = this.story?.locations?.jewel_building_bg?.x ?? 0;
+            const targetHouseX = this.story?.locations?.luxury_house_bg?.x ?? (this.story?.locations?.jewel_building_bg?.displayWidth || 1544);
             const halfCharWidth = 90;
-            const houseHeroPreStopX = targetHouseX - 75 - halfCharWidth;
-            const houseGirlPreStopX = houseHeroPreStopX - 115;
-            const houseTargetGirlX = targetHouseX - spacing;
+            const houseHeroTargetX = targetHouseX - halfCharWidth;
 
             const distance = Math.abs(targetHouseX - startX);
             const walkSpeed = this.story?.walk_speed || 500;
             const cameraDuration = Math.round((distance / walkSpeed) * 1000);
 
-            // 1. After selecting a house, hero emotion changes to hero_face_happy
             if (hero) {
                 hero.setFace('happy');
             }
-
-            // 2. Girl 1 approaches hero, then both walk together with camera to house scene
-            const girl1TargetX = (hero ? hero.x - 115 : startX - halfCharWidth - 115);
 
             this.isTransitioning = true;
             const targetLocKey = (this.chosenHouse === 'choice_simple') ? 'simple_house_bg' : 'luxury_house_bg';
 
             const snapWalkToHouse = () => {
                 this.currentLocationKey = targetLocKey;
+                if (this.partyFX) {
+                    this.partyFX.destroy();
+                    this.partyFX = null;
+                }
+                this._stopPartyMusic();
                 if (typeof this.ui.setHouseBackground === 'function') {
                     this.ui.setHouseBackground(this.chosenHouse || 'choice_luxury');
                 }
@@ -1842,25 +1695,19 @@ export default class StoryController {
                 if (hero) {
                     hero.setVisible(true);
                     hero.resetPose();
-                    hero.setPosition(houseHeroPreStopX, this.heroGroundY);
+                    hero.setPosition(houseHeroTargetX, this.heroGroundY);
                     hero.animator?.playIdle();
                     hero.setFace('amazed');
                     const heroScale = this._getCharacterScale(hero, 1);
                     hero.setScale(heroScale.x, heroScale.y);
                 }
-                if (girl1) {
-                    girl1.setVisible(true);
-                    girl1.resetPose();
-                    girl1.setPosition(houseGirlPreStopX, this.groundY);
-                    girl1.animator?.playIdle();
-                    const girlScale = this._getCharacterScale(girl1, 1);
-                    girl1.setScale(girlScale.x, girlScale.y);
-                }
-                this._runStepHouseArrival({
-                    targetHouseX,
-                    spacing,
-                    houseTargetGirlX
+                friends.forEach((p, idx) => {
+                    p.setVisible(true);
+                    p.resetPose();
+                    p.setPosition(houseHeroTargetX - 120 - (idx * 60), this.groundY);
+                    p.animator?.playIdle();
                 });
+                this._runStepHouseArrival({ targetHouseX });
             };
 
             this._activeTransition = {
@@ -1872,13 +1719,10 @@ export default class StoryController {
 
             this._runWalkToHouse({
                 hero,
-                girl1,
+                friends,
                 startX,
                 targetHouseX,
-                spacing,
-                houseHeroPreStopX,
-                houseGirlPreStopX,
-                houseTargetGirlX,
+                houseHeroTargetX,
                 cameraDuration
             });
         };
@@ -1887,109 +1731,85 @@ export default class StoryController {
     _runWalkToHouse(params) {
         const {
             hero,
-            girl1,
-            startX = (this.story?.locations?.jewel_building_bg?.x ?? (this.story?.locations?.road_bg?.displayWidth || 1544)),
-            targetHouseX = (this.story?.locations?.luxury_house_bg?.x ?? ((this.story?.locations?.road_bg?.displayWidth || 1544) * 2)),
-            spacing = 185,
-            houseHeroPreStopX = (targetHouseX - 75 - 90),
-            houseGirlPreStopX = (targetHouseX - 75 - 90 - 115),
-            houseTargetGirlX = (targetHouseX - 185),
-            cameraDuration = Math.round((Math.abs(targetHouseX - startX) / (this.story?.walk_speed || 500)) * 1000)
+            friends = [],
+            startX = (this.story?.locations?.jewel_building_bg?.x ?? 0),
+            targetHouseX = (this.story?.locations?.luxury_house_bg?.x ?? 1544),
+            houseHeroTargetX = (targetHouseX - 90),
+            cameraDuration = 2500
         } = params || {};
 
         this.currentLocationKey = (this.chosenHouse === 'choice_simple') ? 'simple_house_bg' : 'luxury_house_bg';
         this.isTransitioning = true;
 
-        if (!this._activeTransition) {
-            const snapWalkToHouse = () => {
-                this.currentLocationKey = (this.chosenHouse === 'choice_simple') ? 'simple_house_bg' : 'luxury_house_bg';
-                if (typeof this.ui.setHouseBackground === 'function') {
-                    this.ui.setHouseBackground(this.chosenHouse || 'choice_luxury');
-                }
-                if (this.ui.worldContainer) {
-                    const currentWorldScale = this.ui.worldContainer?.scaleX || 1;
-                    this.ui.worldContainer.x = 300 - targetHouseX * currentWorldScale;
-                }
-                if (hero) {
-                    hero.setVisible(true);
-                    hero.resetPose();
-                    hero.setPosition(houseHeroPreStopX, this.heroGroundY);
-                    hero.animator?.playIdle();
-                    hero.setFace('amazed');
-                    const heroScale = this._getCharacterScale(hero, 1);
-                    hero.setScale(heroScale.x, heroScale.y);
-                }
-                if (girl1) {
-                    girl1.setVisible(true);
-                    girl1.resetPose();
-                    girl1.setPosition(houseGirlPreStopX, this.groundY);
-                    girl1.animator?.playIdle();
-                    const girlScale = this._getCharacterScale(girl1, 1);
-                    girl1.setScale(girlScale.x, girlScale.y);
-                }
-                this._runStepHouseArrival({
-                    targetHouseX,
-                    spacing,
-                    houseTargetGirlX
-                });
-            };
-
-            this._activeTransition = {
-                type: 'walk_to_house',
-                tweens: [],
-                delayedCalls: [],
-                snap: snapWalkToHouse
-            };
+        if (this.partyFX) {
+            this.partyFX.finishParty();
         }
 
         const worldScale = this.ui.worldContainer?.scaleX || 1;
         const startCamX = 300 - startX * worldScale;
         const endCamX = 300 - targetHouseX * worldScale;
 
-        // Rely on live coordinates rather than resetting or snapping to a precalculated start position
         const liveHeroX = hero ? hero.x : (startX - 90);
-        const liveGirl1X = girl1 ? girl1.x : (liveHeroX - 115);
 
-        if (hero) hero.animator?.playWalk();
-        if (girl1) girl1.animator?.playWalk();
+        // 1. Hero starts walking forward towards the house
+        if (hero) {
+            hero.animator?.playWalk();
+            const heroTween = this.scene.tweens.add({
+                targets: hero,
+                x: houseHeroTargetX,
+                duration: cameraDuration,
+                ease: 'Power1.easeInOut',
+                onComplete: () => {
+                    hero.animator?.playIdle();
+                }
+            });
+            if (this._activeTransition) {
+                this._activeTransition.tweens.push(heroTween);
+            }
+        }
 
-        let heroStopped = false;
+        // 2. Friends: NO TELEPORTING - start strictly from their current resting positions where they finished dancing
+        // with sequential per-character stagger (50-150ms delay) so they do not snap or move in rigid synchrony
+        friends.forEach((p, idx) => {
+            const startFriendX = p.x;
+            const targetFriendX = houseHeroTargetX - 120 - (idx * 60);
+            const staggerDelay = 60 + (idx * 90); // 60ms, 150ms, 240ms, 330ms, 420ms
+            const friendDuration = Math.max(1200, cameraDuration - staggerDelay);
 
-        // Pan camera alongside hero and girl 1 to the house scene
+            const friendTween = this.scene.tweens.add({
+                targets: p,
+                x: targetFriendX,
+                delay: staggerDelay,
+                duration: friendDuration,
+                ease: 'Power1.easeInOut',
+                onStart: () => {
+                    const pScale = this._getCharacterScale(p, 1);
+                    p.setScale(pScale.x, pScale.y);
+                    p.animator?.playWalk({ speed: 0.52 + (idx % 3) * 0.05 });
+                },
+                onComplete: () => {
+                    p.animator?.playIdle();
+                }
+            });
+
+            if (this._activeTransition) {
+                this._activeTransition.tweens.push(friendTween);
+            }
+        });
+
+        // 3. Camera pan
         if (this.ui.worldContainer) {
             const camTween = this.scene.tweens.add({
                 targets: this.ui.worldContainer,
                 x: endCamX,
                 duration: cameraDuration,
                 ease: 'Power1.easeInOut',
-                onUpdate: () => {
-                    const currentWorldScale = this.ui.worldContainer?.scaleX || 1;
-                    const camMoved = (startCamX - this.ui.worldContainer.x) / currentWorldScale;
-                    if (!heroStopped) {
-                        if (liveHeroX + camMoved >= houseHeroPreStopX) {
-                            heroStopped = true;
-                            if (hero) {
-                                hero.x = houseHeroPreStopX;
-                                hero.animator?.playIdle();
-                            }
-                            if (girl1) {
-                                girl1.x = liveGirl1X + (houseHeroPreStopX - liveHeroX);
-                                girl1.animator?.playIdle();
-                            }
-                        } else {
-                            if (hero) hero.x = liveHeroX + camMoved;
-                            if (girl1) girl1.x = liveGirl1X + camMoved;
-                        }
-                    }
-                },
                 onComplete: () => {
                     this.isTransitioning = false;
                     this._activeTransition = null;
-                    this._runStepHouseArrival({
-                        targetHouseX,
-                        spacing,
-                        houseTargetGirlX
-                    });
+                    if (hero) hero.animator?.playIdle();
+                    friends.forEach(p => p.animator?.playIdle());
+                    this._runStepHouseArrival({ targetHouseX });
                 }
             });
             if (this._activeTransition) {
@@ -1998,30 +1818,28 @@ export default class StoryController {
         } else {
             this.isTransitioning = false;
             this._activeTransition = null;
-            this._runStepHouseArrival({
-                targetHouseX,
-                spacing,
-                houseTargetGirlX
-            });
+            this._runStepHouseArrival({ targetHouseX });
         }
     }
 
     _runStepHouseArrival(params = {}) {
-        const houseCenter = params.targetHouseX || this.story?.locations?.luxury_house_bg?.x || ((this.story?.locations?.road_bg?.displayWidth || 1544) * 2);
+        const houseCenter = params.targetHouseX || this.story?.locations?.luxury_house_bg?.x || 1544;
         const halfCharWidth = 90;
         const hero = this.puppets.hero;
-        const girl1 = this.puppets.girl_1;
         const girl2 = this.puppets.girl_2;
 
-        // "The hero's emotion should change to hero_face_amazed."
         if (hero) {
             hero.setFace('amazed');
         }
+        if (this.puppets.man_1) {
+            this.puppets.man_1.setVisible(false);
+        }
 
         const isPortrait = this.scene.scale.width < this.scene.scale.height;
-        // Shift arrival destination of girl_2 significantly closer to hero
-        const girl2Spacing = isPortrait ? 65 : 75;
-        const girl2TargetX = houseCenter + girl2Spacing; // ~1915-1925
+        const fullCharWidth = halfCharWidth * 2; // ~180px body width
+        // Stop further to the right by approximately one full body width compared to current resting position
+        const girl2Spacing = (isPortrait ? 65 : 75) + fullCharWidth;
+        const girl2TargetX = houseCenter + girl2Spacing;
 
         let heroFinished = false;
         let girl2Finished = false;
@@ -2029,12 +1847,11 @@ export default class StoryController {
         const checkDone = () => {
             if (heroFinished && girl2Finished) {
                 this.scene.time.delayedCall(350, () => {
-                    this.goToStep('step_choose_ring');
+                    this.goToStep('step_choose_woman');
                 });
             }
         };
 
-        // Hero approaches half his width to the left of the center of the screen
         const heroTargetX = houseCenter - halfCharWidth;
         if (hero) {
             hero.animator?.playWalk();
@@ -2053,10 +1870,10 @@ export default class StoryController {
             heroFinished = true;
         }
 
-        // "Girl 2 exits from the right."
         if (girl2) {
-            girl2.setDepth(35);
-            girl2.setPosition(houseCenter + 800, this.groundY + 76);
+            girl2.setDepth(28); // Rendered behind Hero (depth 30)
+            girl2.setPosition(houseCenter + 800, this.girl2GroundY);
+            girl2.y = this.girl2GroundY;
             const girl2Scale = this._getCharacterScale(girl2, -1);
             girl2.setScale(girl2Scale.x, girl2Scale.y);
             girl2.setVisible(true);
@@ -2065,12 +1882,23 @@ export default class StoryController {
                 Utils.addAudio(this.scene, 'voice_hero_gasp_aah', 1.0);
             } catch (e) { }
 
+            // Friends remain strictly in their current positions on screen (idle animation / subtle ambient breathing/sway) without retreating
+            const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5].filter(c => !!c);
+            friends.forEach(p => {
+                const pScale = this._getCharacterScale(p, 1);
+                p.setScale(pScale.x, pScale.y); // Face right toward Hero and girl_2
+                p.animator?.playIdle();
+            });
+
             this.scene.tweens.add({
                 targets: girl2,
-                x: girl2TargetX, // 2035
+                x: girl2TargetX,
+                y: this.girl2GroundY,
                 duration: 1800,
                 ease: 'Power1.easeOut',
                 onComplete: () => {
+                    girl2.y = this.girl2GroundY;
+                    girl2.setDepth(28);
                     girl2.animator?.playIdle();
                     girl2Finished = true;
                     checkDone();
@@ -2082,22 +1910,295 @@ export default class StoryController {
         }
     }
 
+    _runStepChooseWoman() {
+        const step = this.story?.steps?.step_choose_woman;
+        if (!step || !step.choices) return;
+
+        // Friends remain strictly in place (no parting or retreat)
+
+        const introChoiceY = UI_CONFIG?.choice_group?.positions_y?.multiple ?? 205;
+        this.ui.choices?.showChoices(step.choices, { y: introChoiceY, balanceView: this.ui?.balance });
+
+        this.ui.choices.onChoice = (choice) => {
+            if (this.ui.balance && choice.price && this.ui.balance.getValue() < choice.price) {
+                return;
+            }
+            if (this.ui.balance && choice.price) {
+                this.ui.balance.subtract(choice.price);
+            }
+            if (choice.id === 'choice_girl_1') {
+                this.goToStep('step_fail_end_woman');
+            } else {
+                // Girl 2 steps up
+                const girl2 = this.puppets.girl_2;
+                const hero = this.puppets.hero;
+                if (girl2 && hero) {
+                    girl2.setDepth(28); // Behind Hero (depth 30)
+                    girl2.animator?.playWalk();
+                    // Subtle step forward toward Hero, maintaining ~half character body width of breathing room
+                    const stepDistance = 65;
+                    const targetX = Math.max(hero.x + 220, girl2.x - stepDistance);
+                    this.scene.tweens.add({
+                        targets: girl2,
+                        x: targetX,
+                        y: this.girl2GroundY,
+                        duration: 800,
+                        onComplete: () => {
+                            girl2.y = this.girl2GroundY;
+                            girl2.setDepth(28);
+                            girl2.animator?.stopAll();
+                            girl2.setFace('idle');
+                            this.goToStep('step_choose_ring');
+                        }
+                    });
+                } else {
+                    this.goToStep('step_choose_ring');
+                }
+            }
+        };
+    }
+
+    _runStepFailEndWoman() {
+        const hero = this.puppets.hero;
+        const girl1 = this.puppets.girl_1;
+        const girl2 = this.puppets.girl_2;
+        const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5].filter(c => !!c && c.visible !== false);
+
+        // Find nearest friend to girl2 (friends are located to the left of Hero)
+        let nearestFriend = null;
+        if (girl2 && friends.length > 0) {
+            let minDistance = Infinity;
+            friends.forEach(f => {
+                const dist = Math.abs(f.x - girl2.x);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestFriend = f;
+                }
+            });
+        }
+        if (!nearestFriend && friends.length > 0) {
+            nearestFriend = friends[friends.length - 1];
+        }
+
+        // --- Step 1: Girl 2 Spurns & Kisses a Friend ---
+        const onKissComplete = () => {
+            // --- Step 2: Girl 1 Entrance from the Right ---
+            this.scene.time.delayedCall(400, () => {
+                bringGirl1In();
+            });
+        };
+
+        if (girl2 && nearestFriend) {
+            const targetKissX = nearestFriend.x + 60;
+            const girl2Scale = this._getCharacterScale(girl2, -1); // Face left toward friend
+            girl2.setScale(girl2Scale.x, girl2Scale.y);
+            girl2.animator?.playWalk({ speed: 0.65 });
+
+            this.scene.tweens.add({
+                targets: girl2,
+                x: targetKissX,
+                y: this.girl2GroundY,
+                duration: 950,
+                ease: 'Power1.easeOut',
+                onComplete: () => {
+                    girl2.y = this.girl2GroundY;
+                    girl2.animator?.stopAll();
+                    girl2.setAttachment('face', 'girl2_face_kiss');
+                    try {
+                        Utils.addAudio(this.scene, 'kiss_smack', 1.0);
+                    } catch (e) { }
+
+                    // Kiss animation head tilt
+                    if (girl2.bones?.head) {
+                        this.scene.tweens.add({
+                            targets: girl2.bones.head,
+                            angle: -14,
+                            duration: 250,
+                            yoyo: true,
+                            repeat: 1
+                        });
+                    }
+                    if (nearestFriend.bones?.head) {
+                        nearestFriend.animator?.stopAll();
+                        this.scene.tweens.add({
+                            targets: nearestFriend.bones.head,
+                            angle: 14,
+                            duration: 250,
+                            yoyo: true,
+                            repeat: 1
+                        });
+                    }
+
+                    onKissComplete();
+                }
+            });
+        } else {
+            onKissComplete();
+        }
+
+        // --- Step 2: Girl 1 Entrance from the Right ---
+        const bringGirl1In = () => {
+            if (!girl1) {
+                startMockeryAndExit();
+                return;
+            }
+
+            const worldScale = this.ui.worldContainer?.scaleX || 1;
+            const containerX = this.ui.worldContainer?.x ?? 0;
+            const screenRightLocal = (this.scene.scale.width - containerX) / worldScale;
+            const fromX = Math.max(Math.round(screenRightLocal + 140), (hero ? hero.x : 1500) + 550);
+            const girl1RestingX = hero ? hero.x + 130 : 1600;
+            const girl1Y = this.groundY + (girl1.baseYOffset || 0);
+
+            girl1.setPosition(fromX, girl1Y);
+            const girl1Scale = this._getCharacterScale(girl1, -1); // Face left toward Hero
+            girl1.setScale(girl1Scale.x, girl1Scale.y);
+            girl1.setVisible(true);
+            girl1.setDepth(29);
+            if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+                this.ui.worldContainer.sort('depth');
+            }
+            girl1.animator?.playWalk({ speed: 0.6 });
+
+            this.scene.tweens.add({
+                targets: girl1,
+                x: girl1RestingX,
+                duration: 1250,
+                ease: 'Power1.easeOut',
+                onComplete: () => {
+                    girl1.animator?.stopAll();
+                    girl1.animator?.playIdle();
+                    girl1.setFace('idle');
+
+                    // --- Step 3: Crowd Reaction & Mockery ---
+                    this.scene.time.delayedCall(300, () => {
+                        startMockeryAndExit();
+                    });
+                }
+            });
+        };
+
+        // --- Step 3: Crowd Reaction & Mockery, Step 4: Hero Cry & Exit, Step 5: Finale Window ---
+        const startMockeryAndExit = () => {
+            try {
+                Utils.addAudio(this.scene, 'crowd_laugh', 1.0);
+            } catch (e) { }
+
+            // All characters mock and point at Hero
+            const mockCrowd = [...friends, girl2, girl1].filter(c => !!c);
+            mockCrowd.forEach(p => {
+                p.setFace('happy');
+                if (hero && p.x < hero.x) {
+                    // Left of Hero: face right and point arm at Hero
+                    const s = this._getCharacterScale(p, 1);
+                    p.setScale(s.x, s.y);
+                    if (p.bones?.arm_right) {
+                        this.scene.tweens.add({
+                            targets: p.bones.arm_right,
+                            angle: -65,
+                            duration: 220,
+                            yoyo: true,
+                            repeat: 3,
+                            ease: 'Sine.easeInOut'
+                        });
+                    }
+                } else if (hero && p.x >= hero.x) {
+                    // Right of Hero: face left and point arm at Hero
+                    const s = this._getCharacterScale(p, -1);
+                    p.setScale(s.x, s.y);
+                    if (p.bones?.arm_left) {
+                        this.scene.tweens.add({
+                            targets: p.bones.arm_left,
+                            angle: 65,
+                            duration: 220,
+                            yoyo: true,
+                            repeat: 3,
+                            ease: 'Sine.easeInOut'
+                        });
+                    }
+                }
+            });
+
+            // --- Step 4: Hero Cry & Exit of All Characters ---
+            this.scene.time.delayedCall(400, () => {
+                this._stopAllWalkSounds();
+                if (hero) {
+                    hero.setFace('crying');
+                    hero.setAttachment('face', 'hero_face_crying');
+                    hero.animator?.playCry();
+                    if (hero.bones?.arm_left) {
+                        this.scene.tweens.add({ targets: hero.bones.arm_left, angle: 160, duration: 400, ease: 'Power1.easeOut' });
+                    }
+                    if (hero.bones?.arm_right) {
+                        this.scene.tweens.add({ targets: hero.bones.arm_right, angle: -160, duration: 400, ease: 'Power1.easeOut' });
+                    }
+                }
+            });
+
+            // Characters turn around and walk off-screen, leaving Hero completely alone
+            this.scene.time.delayedCall(1200, () => {
+                // Left group (friends & girl_2) turn left and walk off to the left
+                const leftGroup = [...friends, girl2].filter(c => !!c);
+                leftGroup.forEach((p, idx) => {
+                    const s = this._getCharacterScale(p, -1); // Turn left to walk away
+                    p.setScale(s.x, s.y);
+                    p.animator?.playWalk({ speed: 0.7 });
+                    this.scene.tweens.add({
+                        targets: p,
+                        x: p.x - 900,
+                        duration: 1800,
+                        delay: idx * 60,
+                        ease: 'Power1.easeIn',
+                        onComplete: () => {
+                            p.setVisible(false);
+                            p.animator?.stopAll();
+                            this._stopAllWalkSounds();
+                        }
+                    });
+                });
+
+                // Girl 1 (on the right) turns right and walks off to the right
+                if (girl1) {
+                    const s = this._getCharacterScale(girl1, 1); // Turn right to walk away
+                    girl1.setScale(s.x, s.y);
+                    girl1.animator?.playWalk({ speed: 0.7 });
+                    this.scene.tweens.add({
+                        targets: girl1,
+                        x: girl1.x + 900,
+                        duration: 1800,
+                        ease: 'Power1.easeIn',
+                        onComplete: () => {
+                            girl1.setVisible(false);
+                            girl1.animator?.stopAll();
+                            this._stopAllWalkSounds();
+                        }
+                    });
+                }
+
+                // --- Step 5: Finale Window (Camera zooms in on crying Hero who stays in place) ---
+                this.scene.time.delayedCall(1100, () => {
+                    this._stopAllWalkSounds();
+                    this._zoomInOnHero(() => {
+                        if (this.ui.finalWindow) {
+                            this.ui.finalWindow.show();
+                        }
+                        this._createFinaleButtons();
+                    });
+                });
+            });
+        };
+    }
+
     _runStepChooseRing() {
         const step = this.story?.steps?.step_choose_ring;
         if (!step || !step.choices) return;
 
-        // Display choice cards (clown_ico vs girl2_ico)
-        const choiceY = (step.choices.length > 1)
-            ? (UI_CONFIG?.choice_group?.positions_y?.multiple ?? 205)
-            : (UI_CONFIG?.choice_group?.positions_y?.single ?? -145);
-        this.ui.choices?.showChoices(step.choices, { y: choiceY, balanceView: this.ui?.balance });
-        try {
-            Utils.addAudio(this.scene, 'voice_girl1_jealous_grunt', 1.0);
-        } catch (e) { }
+        const introChoiceY = UI_CONFIG?.choice_group?.positions_y?.multiple ?? 205;
+        this.ui.choices?.showChoices(step.choices, { y: introChoiceY, balanceView: this.ui?.balance });
 
         this.ui.choices.onChoice = (choice) => {
-            // Guard: Insufficient funds check
             if (this.ui.balance && choice.price && this.ui.balance.getValue() < choice.price) {
+                // Handled internally by choice group (red flash, error)
                 return;
             }
 
@@ -2105,483 +2206,212 @@ export default class StoryController {
                 this.ui.balance.subtract(choice.price);
             }
 
-            if (choice.id === 'choice_clown' || choice.icon === 'clown_ico') {
-                this._playClownSequence(() => {
-                    this.goToStep('step_fail_end');
-                });
+            this.chosenRing = choice.id;
+
+            if (choice.id === 'choice_bad_ring') {
+                this.goToStep('step_fail_end');
             } else {
-                // "if you choose girl2_ico the same thing should happen as now happens when you choose a ring"
-                this._playRingBoxSequence(() => {
-                    this.goToStep('step_fail_end');
-                });
+                this.goToStep('step_fail_end');
             }
         };
     }
 
-    _playClownSequence(onComplete) {
+    _runStepFailEnd() {
         const hero = this.puppets.hero;
-        const girl1 = this.puppets.girl_1;
         const girl2 = this.puppets.girl_2;
-        const clown = this.puppets.clown;
-        const houseCenter = this.story?.locations?.luxury_house_bg?.x ?? ((this.story?.locations?.road_bg?.displayWidth || 1544) * 2);
+        const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5];
 
-        // 1. Girl 2 turns to the right
-        if (girl2) {
-            girl2.setScale(Math.abs(girl2.scaleX), girl2.scaleY);
-        }
+        // 1. Play box opening animation using unified ring box container
+        const halfCharWidth = 90;
+        // Shift spawn position of ring box container to the right by approximately half of Hero's body width
+        const boxX = hero.x + halfCharWidth + 45;
+        const boxY = this.heroGroundY - 45;
 
-        // 2. Clown comes out on the right, walking swaying from right to left, and approaches Girl 2
-        if (clown) {
-            clown.setDepth(36);
-            const isPortrait = this.scene.scale.width < this.scene.scale.height;
-            // Pull stopping position inward so clown stays completely within viewport in portrait
-            const clownApproachOffset = isPortrait ? 95 : 105;
-            const targetClownX = girl2 ? (girl2.x + clownApproachOffset) : (houseCenter + 165);
-
-            const spawnX = Math.max(houseCenter + 550, targetClownX + 360);
-            clown.setPosition(spawnX, this.groundY + 76);
-            const clownScale = this._getCharacterScale(clown, -1);
-            clown.setScale(clownScale.x, clownScale.y); // Facing left towards Girl 2
-            clown.setVisible(true);
-            clown.setFace('idle');
-            clown.animator?.playWalk();
-            try {
-                Utils.addAudio(this.scene, 'clown_horn', 1.0);
-            } catch (e) { }
-
-            // Clown waddle/sway from right to left while walking
-            const swayTween = this.scene.tweens.add({
-                targets: clown,
-                angle: { from: -10, to: 10 },
-                duration: 250,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
-            });
-
-            const clownDist = Math.abs(clown.x - targetClownX);
-            const clownWalkSpeed = 190;
-            const clownWalkDuration = Math.round((clownDist / clownWalkSpeed) * 1000);
-
-            // Duck main BGM while cello dramatic tension plays
-            this.duckMainBgm(0.15, 350);
-
-            let celloSound = null;
-            let celloRestored = false;
-            const onCelloFinished = () => {
-                if (celloRestored) return;
-                celloRestored = true;
-                if (this._celloFallbackTimer) {
-                    this._celloFallbackTimer.remove();
-                    this._celloFallbackTimer = null;
-                }
-                this._celloSound = null;
-                this.restoreMainBgm(450);
-            };
-
-            try {
-                celloSound = Utils.addAudio(this.scene, 'cello_dramatic_tension', 1.0);
-                this._celloSound = celloSound;
-            } catch (e) { }
-
-            if (celloSound && typeof celloSound.once === 'function') {
-                celloSound.once('complete', onCelloFinished);
-            }
-
-            // Estimate duration from spritemap or fallback to 8500ms
-            let celloDurationMs = 8500;
-            if (celloSound?.spritemap?.cello_dramatic_tension) {
-                const entry = celloSound.spritemap.cello_dramatic_tension;
-                if (typeof entry.end === 'number' && typeof entry.start === 'number') {
-                    celloDurationMs = Math.round((entry.end - entry.start) * 1000) + 100;
-                }
-            }
-            this._celloFallbackTimer = this.scene.time.delayedCall(celloDurationMs, onCelloFinished);
-
-            this.scene.tweens.add({
-                targets: clown,
-                x: targetClownX,
-                duration: clownWalkDuration,
-                ease: 'Linear',
-                onComplete: () => {
-                    swayTween.stop();
-                    clown.angle = 0;
-                    clown.animator?.playIdle();
-                    clown.setFace('kiss');
-
-                    // 3. He approaches Girl 2, she starts running to the left, Girl 1 runs away with her,
-                    // and at this time the hero trembles slightly out of sync with all parts
-                    this.scene.time.delayedCall(300, () => {
-                        // Girl 2 turns left and runs
-                        if (girl2) {
-                            girl2.setScale(-Math.abs(girl2.scaleX), girl2.scaleY);
-                            girl2.animator?.playRun();
-                        }
-
-                        // Girl 1 turns left and runs
-                        if (girl1) {
-                            girl1.setScale(-Math.abs(girl1.scaleX), girl1.scaleY);
-                            girl1.animator?.playRun();
-                        }
-
-                        try {
-                            Utils.addAudio(this.scene, 'run_scramble', 1.0);
-                        } catch (e) { }
-
-                        // Both girls run away to the left
-                        this.scene.tweens.add({
-                            targets: [girl1, girl2].filter(Boolean),
-                            x: '-=720',
-                            duration: 1300,
-                            ease: 'Power1.easeIn',
-                            onComplete: () => {
-                                if (girl1) { girl1.setVisible(false); girl1.animator?.playIdle(); }
-                                if (girl2) { girl2.setVisible(false); girl2.animator?.playIdle(); }
-                            }
-                        });
-
-                        // At this time the hero trembles slightly out of sync with all parts
-                        if (hero) {
-                            hero.setFace('surprised');
-                            hero.animator?.playTremble();
-                            try {
-                                this._trembleSound = Utils.addAudio(this.scene, 'tremble_teeth', 1.0, true);
-                            } catch (e) { }
-                        }
-
-                        // 4. Clown starts running towards hero, and hero also runs to the right
-                        this.scene.time.delayedCall(700, () => {
-                            if (clown) {
-                                clown.setFace('idle');
-                                clown.animator?.playRun();
-
-                                const chargeTargetX = (hero ? hero.x + 85 : houseCenter);
-                                this.scene.tweens.add({
-                                    targets: clown,
-                                    x: chargeTargetX,
-                                    duration: 1100,
-                                    ease: 'Power1.easeInOut'
-                                });
-                            }
-
-                            // Hero sees clown charging, flips to the right and also runs to the right
-                            this.scene.time.delayedCall(350, () => {
-                                if (this._trembleSound) {
-                                    this._trembleSound.stop();
-                                    this._trembleSound = null;
-                                }
-                                if (hero) {
-                                    hero.setScale(Math.abs(hero.scaleX), hero.scaleY);
-                                    hero.animator?.playRun();
-
-                                    this.scene.tweens.add({
-                                        targets: hero,
-                                        x: '+=850',
-                                        duration: 1200,
-                                        ease: 'Power1.easeIn',
-                                        onComplete: () => {
-                                            hero.setVisible(false);
-                                            hero.animator?.playIdle();
-                                        }
-                                    });
-                                }
-                            });
-
-                            // 5. Clown stops and executes camera approach zoom-in before final window
-                            this.scene.time.delayedCall(1250, () => {
-                                if (clown) {
-                                    clown.animator?.playIdle();
-                                    clown.setFace('kiss');
-                                }
-
-                                this.scene.time.delayedCall(450, () => {
-                                    this._playCameraApproach(clown, () => {
-                                        if (onComplete) onComplete();
-                                    });
-                                });
-                            });
-                        });
-                    });
-                }
-            });
-        } else {
-            if (onComplete) onComplete();
-        }
-    }
-
-    _playRingBoxSequence(onComplete) {
-        const hero = this.puppets.hero;
-        const girl1 = this.puppets.girl_1;
-        const girl2 = this.puppets.girl_2;
-        const houseCenter = this.story?.locations?.luxury_house_bg?.x ?? ((this.story?.locations?.road_bg?.displayWidth || 1544) * 2);
-
-        // Position ring box between hero and girl 2
-        const boxX = (hero && girl2) ? Math.round((hero.x + girl2.x) / 2) : (houseCenter + 15);
-        const boxY = this.groundY - 50;
-
+        // Horizontally mirror ring box container (scaleX = -0.55) so it faces correctly toward Hero
         const boxContainer = this.scene.add.container(boxX, boxY);
-        boxContainer.setScale(0);
-        boxContainer.setDepth(50);
+        boxContainer.setScale(-0.55, 0.55);
+        boxContainer.setDepth(40);
+
+        const boxBottomTexture = (this.chosenRing === 'choice_luxury_ring') ? 'ring_luxury_box_bottom' : 'ring_bad_box_bottom';
+        const boxTopTexture = (this.chosenRing === 'choice_luxury_ring') ? 'ring_luxury_box_top' : 'ring_bad_box_top';
+
+        const boxBottom = this.scene.add.image(0, 0, boxBottomTexture);
+        // Shifted downward by ~one lid height (~51px, from -45 to 6) so bottom edge sits flush on box base rim
+        const boxTop = this.scene.add.image(72, 6, boxTopTexture);
+        // Anchor/origin strictly set to bottom-right corner (originX = 1, originY = 1)
+        boxTop.setOrigin(1, 1);
+
+        boxContainer.add(boxBottom);
+        boxContainer.add(boxTop);
         if (this.ui.worldContainer) {
             this.ui.worldContainer.add(boxContainer);
         }
+        this.ringBoxContainer = boxContainer;
 
-        const ringBoxCfg = UI_CONFIG?.ring_box || {};
-        const bottomCfg = ringBoxCfg.bottom || { texture: 'ring_box_bottom', x: 0, y: 10, scale: 0.55 };
-        const topCfg = ringBoxCfg.top || { texture: 'ring_box_top', x: -28, y: 1, scale: 0.55, origin: { x: 0.12, y: 0.88 } };
-
-        // 1. Box Bottom
-        const boxBottom = this.scene.add.image(bottomCfg.x, bottomCfg.y, bottomCfg.texture);
-        boxBottom.setScale(bottomCfg.scale);
-        boxContainer.add(boxBottom);
-
-        // 2. Box Top (hinge lid)
-        const boxTop = this.scene.add.image(topCfg.x, topCfg.y, topCfg.texture);
-        boxTop.setOrigin(topCfg.origin?.x ?? 0.12, topCfg.origin?.y ?? 0.88);
-        boxTop.setScale(topCfg.scale);
-        boxContainer.add(boxTop);
-
-        try {
-            Utils.addAudio(this.scene, 'click', 1.0);
-        } catch (e) { }
-
-        // Box appearance animation
+        // Opening animation pivots cleanly upward and backward from bottom-right anchor relative to base sprite
         this.scene.tweens.add({
-            targets: boxContainer,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 350,
-            ease: 'Back.easeOut',
-            onComplete: () => {
-                this.scene.time.delayedCall(250, () => {
-                    try {
-                        Utils.addAudio(this.scene, 'ring_box_open', 1.0);
-                    } catch (e) { }
-                    // Lid hinges open revealing ring
-                    this.scene.tweens.add({
-                        targets: boxTop,
-                        angle: -65,
-                        duration: 500,
-                        ease: 'Back.easeOut',
-                        onComplete: () => {
-                            // The ring should disappear after opening with a delay of 1 second
-                            this.scene.time.delayedCall(1000, () => {
-                                this.scene.tweens.add({
-                                    targets: boxContainer,
-                                    alpha: 0,
-                                    scaleX: 0,
-                                    scaleY: 0,
-                                    duration: 300,
-                                    ease: 'Power2.easeIn',
-                                    onComplete: () => {
-                                        if (boxContainer && boxContainer.scene) {
-                                            boxContainer.destroy();
-                                        }
-                                    }
-                                });
-                            });
+            targets: boxTop,
+            angle: 100,
+            duration: 450,
+            ease: 'Power2.easeOut'
+        });
 
-                            // Girl 2 turns on the girl2_face_kiss emote for 1600 milliseconds
-                            if (girl2) {
-                                girl2.setDepth(35);
-                                girl2.setFace('kiss');
+        // girl_2 disgusted
+        if (girl2) {
+            girl2.setFace('idle');
+            girl2.setDepth(28); // Behind Hero (depth 30)
+        }
+
+        try { Utils.addAudio(this.scene, 'crowd_laugh', 1.0); } catch (e) { }
+
+        // girl_2 walks to nearest friend (let's say friend1) and plays kiss
+        const nearestFriend = friends.find(f => !!f);
+        if (girl2 && nearestFriend) {
+            girl2.animator?.playWalk();
+            this.scene.tweens.add({
+                targets: girl2,
+                x: nearestFriend.x + 60,
+                y: this.girl2GroundY,
+                duration: 1000,
+                onComplete: () => {
+                    girl2.y = this.girl2GroundY;
+                    girl2.animator?.stopAll();
+                    girl2.setAttachment('face', 'girl2_face_kiss');
+                    try { Utils.addAudio(this.scene, 'kiss_smack', 1.0); } catch (e) { }
+
+                    this.scene.time.delayedCall(800, () => {
+                        // turn around and walk off
+                        const allCrowd = [girl2, ...friends].filter(c => !!c);
+                        allCrowd.forEach(p => {
+                            const scale = this._getCharacterScale(p, 1);
+                            p.setScale(scale.x, scale.y);
+                            p.animator?.playWalk();
+                            this.scene.tweens.add({
+                                targets: p,
+                                x: p.x + 800,
+                                duration: 2000,
+                                onComplete: () => {
+                                    p.setVisible(false);
+                                    p.animator?.stopAll();
+                                    this._stopAllWalkSounds();
+                                }
+                            });
+                        });
+
+                        // Hero crying alone
+                        this._stopAllWalkSounds();
+                        if (hero) {
+                            hero.setAttachment('face', 'hero_face_crying');
+                            if (hero.bones?.arm_left) {
+                                this.scene.tweens.add({ targets: hero.bones.arm_left, angle: 160, duration: 500 });
+                            }
+                            if (hero.bones?.arm_right) {
+                                this.scene.tweens.add({ targets: hero.bones.arm_right, angle: -160, duration: 500 });
                             }
 
-                            // girl2_face_kiss should change back to girl2_face_idle after 1600 milliseconds, and only after that girl 2 should go
-                            this.scene.time.delayedCall(1600, () => {
-                                if (girl2) {
-                                    girl2.setDepth(35);
-                                    girl2.setFace('idle');
-                                    girl2.animator?.playWalk();
-
-                                    const targetX = (girl1 ? girl1.x + 110 : houseCenter - 75);
-                                    const distToGirl1 = Math.abs(girl2.x - targetX);
-                                    // Walk speed consistent with other characters (~180-200 px/s)
-                                    const characterWalkSpeed = 190;
-                                    const walkToGirlDuration = Math.round((distToGirl1 / characterWalkSpeed) * 1000);
-
-                                    this.scene.tweens.add({
-                                        targets: girl2,
-                                        x: targetX,
-                                        duration: walkToGirlDuration,
-                                        ease: 'Linear',
-                                        onComplete: () => {
-                                            girl2.animator?.playIdle();
-                                            try {
-                                                Utils.addAudio(this.scene, 'kiss_smack', 1.0);
-                                            } catch (e) { }
-
-                                            // "Girl 1 turns around (flips horizontally)."
-                                            if (girl1) {
-                                                girl1.setScale(-Math.abs(girl1.scaleX), girl1.scaleY);
-                                            }
-
-                                            // "The hero's emotion should change to hero_face_surprised."
-                                            if (hero) {
-                                                hero.setFace('surprised');
-                                            }
-
-                                            // "Girl 1 and Girl 2 move to the left, and the final window is enabled"
-                                            this.scene.time.delayedCall(750, () => {
-                                                try {
-                                                    Utils.addAudio(this.scene, 'hero_shock_sting', 1.0);
-                                                } catch (e) { }
-                                                if (girl1) girl1.animator?.playWalk();
-                                                if (girl2) {
-                                                    girl2.setScale(-Math.abs(girl2.scaleX), girl2.scaleY);
-                                                    girl2.animator?.playWalk();
-                                                }
-
-                                                // Both girls walk away to the left at consistent character walk speed
-                                                const exitDist = 520;
-                                                const exitDuration = Math.round((exitDist / characterWalkSpeed) * 1000);
-
-                                                this.scene.tweens.add({
-                                                    targets: [girl1, girl2].filter(Boolean),
-                                                    x: `-=${exitDist}`,
-                                                    duration: exitDuration,
-                                                    ease: 'Linear',
-                                                    onComplete: () => {
-                                                        if (girl1) { girl1.setVisible(false); girl1.animator?.stopAll(); }
-                                                        if (girl2) { girl2.setVisible(false); girl2.animator?.stopAll(); }
-
-                                                        // Hero remains on stage and performs camera approach zoom-in before final window
-                                                        if (hero) {
-                                                            this._playCameraApproach(hero, () => {
-                                                                if (onComplete) onComplete();
-                                                            });
-                                                        } else {
-                                                            if (onComplete) onComplete();
-                                                        }
-                                                    }
-                                                });
-                                            });
-                                        }
-                                    });
-                                } else {
-                                    if (onComplete) onComplete();
-                                }
+                            // Zoom in
+                            this.scene.time.delayedCall(1000, () => {
+                                this._stopAllWalkSounds();
+                                this._zoomInOnHero(() => {
+                                    if (this.ui.finalWindow) {
+                                        this.ui.finalWindow.show();
+                                    }
+                                    this._createFinaleButtons();
+                                });
                             });
                         }
                     });
-                });
-            }
-        });
-    }
-
-    _playCameraApproach(character, onComplete) {
-        if (!character) {
-            if (typeof onComplete === 'function') onComplete();
-            return;
-        }
-
-        // Smoothly fade out & hide balance plate so it does not obstruct the cinematic approach
-        if (this.ui?.balance) {
-            const balance = this.ui.balance;
-            this.scene.tweens.killTweensOf(balance);
-            this.scene.tweens.add({
-                targets: balance,
-                alpha: 0,
-                duration: 300,
-                ease: 'Sine.easeOut',
-                onComplete: () => {
-                    balance.setVisible(false);
                 }
             });
         }
-
-        const houseCenter = this.story?.locations?.luxury_house_bg?.x ?? ((this.story?.locations?.road_bg?.displayWidth || 1544) * 2);
-
-        // 1. Depth & Layering: bring approaching character to the top of the character layer
-        character.setDepth(150);
-        if (this.ui.worldContainer) {
-            this.ui.worldContainer.bringToTop(character);
-            if (typeof this.ui.worldContainer.sort === 'function') {
-                this.ui.worldContainer.sort('depth');
-            }
-        }
-
-        character._isCameraApproaching = true;
-
-        // 2. Active walk cycle: character walks directly forward toward the camera/player
-        character.animator?.playWalk();
-
-        const approachCfg = this.story?.camera_approach || {};
-        const duration = approachCfg.duration ?? 1400;
-        const ease = approachCfg.ease ?? 'Power1.easeInOut';
-        const cameraZoom = approachCfg.camera_zoom ?? 1.25;
-        const scaleMult = approachCfg.character_scale_multiplier ?? 2;
-
-        // 3. Scale increase: smoothly scale up while maintaining horizontal sign/facing
-        const targetScaleX = character.scaleX * scaleMult;
-        const targetScaleY = character.scaleY * scaleMult;
-
-        // 4. Vertical perspective displacement (Y-axis shift): smoothly move character downward/forward along Y axis
-        // to ground the character's feet and simulate realistic 2.5D perspective walking directly toward the camera viewport
-        const approachYOffset = approachCfg.y_offset ?? 180;
-        const startY = character.y;
-        const targetY = startY + approachYOffset - 200;
-
-        // 5. Horizontal framing: pull smoothly toward center of viewport
-        const targetX = houseCenter;
-
-        try {
-            Utils.addAudio(this.scene, 'zoom_approach', 1.0);
-        } catch (e) { }
-
-        // 6. Dolly Zoom on the camera: smooth camera zoom alongside physical character approach
-        const camera = this.scene.cameras?.main;
-        if (camera) {
-            this.scene.tweens.killTweensOf(camera);
-            this.scene.tweens.add({
-                targets: camera,
-                zoom: cameraZoom,
-                duration: duration,
-                ease: ease
-            });
-        }
-
-        this.scene.tweens.killTweensOf(character);
-        this.scene.tweens.add({
-            targets: character,
-            scaleX: targetScaleX,
-            scaleY: targetScaleY,
-            x: targetX,
-            y: targetY,
-            duration: duration,
-            ease: ease,
-            onComplete: () => {
-                // Settle animation once the approach completes
-                character.animator?.playIdle();
-                try {
-                    this.scene.cameras?.main?.shake(120, 0.003);
-                } catch (e) { }
-                this.scene.time.delayedCall(250, () => {
-                    if (typeof onComplete === 'function') onComplete();
-                });
-            }
-        });
     }
 
-    _runStepFailEnd() {
-        if (this._celloFallbackTimer) {
-            this._celloFallbackTimer.remove();
-            this._celloFallbackTimer = null;
-        }
-        this.restoreMainBgm(350);
-
-        // Activate final modal window (FinalWindow) with "TRY AGAIN" and "RESTART" buttons
-        if (this.ui.finalWindow) {
-            this.ui.finalWindow.show();
+    _zoomInOnHero(onComplete) {
+        const hero = this.puppets.hero;
+        if (!hero) {
+            if (onComplete) onComplete();
+            return;
         }
 
-        this._createFinaleButtons();
+        const cam = this.scene.cameras.main;
+        const zoom = 1.5;
+        const halfViewH = cam.height / (2 * zoom);
+        const halfViewW = cam.width / (2 * zoom);
+
+        const matrix = (typeof hero.getWorldTransformMatrix === 'function') ? hero.getWorldTransformMatrix() : null;
+        const heroCamX = matrix ? matrix.tx : hero.x;
+        const heroCamY = matrix ? matrix.ty : hero.y;
+
+        // 1. Shift zoom target higher on the Y-axis (focus closer to torso/head level rather than feet)
+        let targetCamY = heroCamY - 180;
+        if (hero.bones?.head && typeof hero.bones.head.getWorldTransformMatrix === 'function') {
+            const headMat = hero.bones.head.getWorldTransformMatrix();
+            if (headMat && headMat.ty) {
+                targetCamY = headMat.ty + 40;
+            }
+        }
+        let targetCamX = heroCamX;
+
+        // 2. Strict background clamping:
+        // Ensure zoomed camera view remains clamped within background bounds
+        // so the bottom edge of the background NEVER lifts to expose a black gap
+        const bg = this.scene.houseBg || this.scene.jewelBg;
+        if (bg && typeof bg.getWorldTransformMatrix === 'function') {
+            const bgMat = bg.getWorldTransformMatrix();
+            if (bgMat) {
+                const worldContainerScaleY = Math.abs(this.ui.worldContainer?.scaleY || 1);
+                const mainContainerScaleY = Math.abs(this.scene.mainContainer?.scaleY || 1);
+                const worldContainerScaleX = Math.abs(this.ui.worldContainer?.scaleX || 1);
+                const mainContainerScaleX = Math.abs(this.scene.mainContainer?.scaleX || 1);
+
+                const bgScaleY = (bg.scaleY !== undefined ? Math.abs(bg.scaleY) : 1) * worldContainerScaleY * mainContainerScaleY;
+                const bgScaleX = (bg.scaleX !== undefined ? Math.abs(bg.scaleX) : 1) * worldContainerScaleX * mainContainerScaleX;
+
+                const bgHeight = (bg.height || bg.displayHeight || 982) * bgScaleY;
+                const bgWidth = (bg.width || bg.displayWidth || 988) * bgScaleX;
+
+                const originY = bg.originY !== undefined ? bg.originY : 0.5;
+                const originX = bg.originX !== undefined ? bg.originX : 0.5;
+
+                const bgTop = bgMat.ty - bgHeight * originY;
+                const bgBottom = bgMat.ty + bgHeight * (1 - originY);
+                const bgLeft = bgMat.tx - bgWidth * originX;
+                const bgRight = bgMat.tx + bgWidth * (1 - originX);
+
+                // Ensure bottom edge of camera view (targetCamY + halfViewH) never exceeds bgBottom:
+                if (targetCamY + halfViewH > bgBottom) {
+                    targetCamY = bgBottom - halfViewH;
+                }
+                // Ensure top edge of camera view never goes above bgTop:
+                if (targetCamY - halfViewH < bgTop) {
+                    targetCamY = bgTop + halfViewH;
+                }
+
+                // Ensure horizontal bounds
+                if (targetCamX - halfViewW < bgLeft) {
+                    targetCamX = bgLeft + halfViewW;
+                }
+                if (targetCamX + halfViewW > bgRight) {
+                    targetCamX = bgRight - halfViewW;
+                }
+            }
+        }
+
+        cam.pan(targetCamX, targetCamY, 1000, 'Power2');
+        cam.zoomTo(zoom, 1000, 'Power2', true);
+
+        if (onComplete) {
+            this.scene.time.delayedCall(1100, () => {
+                this._stopAllWalkSounds();
+                onComplete();
+            });
+        }
     }
 
     _createFinaleButtons() {
         if (this.finaleButtons.length > 0) return;
 
-        const container = this.scene.mainContainer;
+        const container = this.scene.finaleContainer || this.scene.mainContainer;
         if (!container) return;
 
         // Left button: TRY AGAIN (green)
@@ -2591,7 +2421,7 @@ export default class StoryController {
             texture: 'btn_try_again_green',
             text: '',
             align: 'Center',
-            px: -125,
+            px: -120,
             py: 320,
             lx: -140,
             ly: 290,
@@ -2610,7 +2440,7 @@ export default class StoryController {
             texture: 'btn_restart_red',
             text: '',
             align: 'Center',
-            px: 125,
+            px: 120,
             py: 320,
             lx: 140,
             ly: 290,
@@ -2624,23 +2454,28 @@ export default class StoryController {
 
         this.finaleButtons = [this.btnTryAgain, this.btnRestart];
 
+        // Ensure main camera ignores finale buttons and uiCamera renders them
+        if (this.scene.cameras?.main && this.scene.finaleContainer) {
+            this.scene.cameras.main.ignore(this.scene.finaleContainer);
+        }
+
         // Animate entrance of both buttons
         this.scene.tweens.add({
             targets: [this.btnTryAgain, this.btnRestart],
-            pScaleX: 0.50,
-            pScaleY: 0.50,
-            lScaleX: 0.52,
-            lScaleY: 0.52,
+            pScaleX: 0.45,
+            pScaleY: 0.45,
+            lScaleX: 0.48,
+            lScaleY: 0.48,
             duration: 450,
             ease: 'Back.easeOut',
             onComplete: () => {
                 this.finaleButtons.forEach((btn) => {
                     this.scene.tweens.add({
                         targets: btn,
-                        pScaleX: 0.50 * 1.06,
-                        pScaleY: 0.50 * 1.06,
-                        lScaleX: 0.52 * 1.06,
-                        lScaleY: 0.52 * 1.06,
+                        pScaleX: 0.45 * 1.06,
+                        pScaleY: 0.45 * 1.06,
+                        lScaleX: 0.48 * 1.06,
+                        lScaleY: 0.48 * 1.06,
                         duration: 800,
                         yoyo: true,
                         repeat: -1,
@@ -2659,6 +2494,7 @@ export default class StoryController {
             ? currentMult.hero_y_offset
             : (this.story?.hero_y_offset !== undefined ? this.story.hero_y_offset : 26);
         this.heroGroundY = this.groundY + this.heroYOffset;
+        this.girl2GroundY = this.heroGroundY + (this.girl2YOffset || 38);
 
         const charScaleMul = isPortrait ? (portCfg.character_scale ?? 0.76) : 1.0;
         const spacingMul = isPortrait ? (portCfg.crowd_spacing ?? 0.58) : 1.0;
@@ -2701,6 +2537,17 @@ export default class StoryController {
                     p.x = targetX;
                 }
             });
+        } else {
+            // In house scene or non-road locations, ensure hero and girl2 maintain their ground baselines
+            const hero = this.puppets?.hero;
+            const girl2 = this.puppets?.girl_2;
+            if (hero && hero.visible) {
+                hero.y = this.heroGroundY;
+            }
+            if (girl2 && girl2.visible) {
+                girl2.y = this.girl2GroundY;
+                girl2.setDepth(28); // Behind Hero (depth 30)
+            }
         }
 
         // 2b. Recompute Business Center & Golden Toilet positions relative to road_bg on resize
@@ -2750,21 +2597,21 @@ export default class StoryController {
         if (!this.finaleButtons || this.finaleButtons.length === 0) return;
         if (isPortrait) {
             if (this.btnTryAgain) {
-                this.btnTryAgain.setCustomPosition(-125, 320);
-                this.btnTryAgain.setScale(0.40);
+                this.btnTryAgain.setCustomPosition(-120, 320);
+                this.btnTryAgain.setScale(0.45);
             }
             if (this.btnRestart) {
-                this.btnRestart.setCustomPosition(125, 320);
-                this.btnRestart.setScale(0.40);
+                this.btnRestart.setCustomPosition(120, 320);
+                this.btnRestart.setScale(0.45);
             }
         } else {
             if (this.btnTryAgain) {
                 this.btnTryAgain.setCustomPosition(-140, 290);
-                this.btnTryAgain.setScale(0.42);
+                this.btnTryAgain.setScale(0.48);
             }
             if (this.btnRestart) {
                 this.btnRestart.setCustomPosition(140, 290);
-                this.btnRestart.setScale(0.42);
+                this.btnRestart.setScale(0.48);
             }
         }
     }

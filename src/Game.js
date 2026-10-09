@@ -61,32 +61,21 @@ export default class Game extends ParentScene {
             return { x: sx, y: sy };
         };
 
-        // 1) Road Background
-        const roadCfg = locs.road_bg || {};
-        const roadScale = getScale(roadCfg, 1.5625);
-        const roadShift = getShift(roadCfg);
-        const roadX = 0 + roadShift.x;
-        const roadY = 0;
-        this.roadBg = this.add.image(roadX, roadY, 'road_bg').setScale(roadScale.x, roadScale.y);
-        this.roadBg.setDepth(0);
-        this.worldContainer.add(this.roadBg);
-        const roadWidth = this.roadBg.displayWidth;
-
-        // 2) Jewel Building Background: placed seamlessly adjacent to Road
+        // 1) Jewel Building Background: primary starting location
         const jewelCfg = locs.jewel_building_bg || {};
-        const jewelScale = getScale(jewelCfg, roadScale.x);
+        const jewelScale = getScale(jewelCfg, 1.5625);
         const jewelShift = getShift(jewelCfg);
         const jewelBaseWidth = this.textures.get('jewel_building_bg')?.getSourceImage()?.width || 988;
         const jewelWidth = jewelBaseWidth * jewelScale.x;
-        const jewelX = roadX + (roadWidth / 2) + (jewelWidth / 2) + jewelShift.x;
+        const jewelX = 0 + jewelShift.x;
         const jewelY = 0;
         this.jewelBg = this.add.image(jewelX, jewelY, 'jewel_building_bg').setScale(jewelScale.x, jewelScale.y);
         this.jewelBg.setDepth(0);
         this.worldContainer.add(this.jewelBg);
 
-        // 3) House Background: placed seamlessly adjacent to Jewel Building
+        // 2) House Background: placed seamlessly adjacent to Jewel Building
         const houseCfg = locs.luxury_house_bg || {};
-        const houseScale = getScale(houseCfg, roadScale.x);
+        const houseScale = getScale(houseCfg, jewelScale.x);
         const houseShift = getShift(houseCfg);
         const houseBaseWidth = this.textures.get('luxury_house_bg')?.getSourceImage()?.width || 988;
         const houseWidth = houseBaseWidth * houseScale.x;
@@ -98,7 +87,6 @@ export default class Game extends ParentScene {
 
         // Publish computed absolute coordinates and sizes into STORY_CONFIG.locations so all controllers dynamically use them
         if (!STORY_CONFIG.locations) STORY_CONFIG.locations = {};
-        STORY_CONFIG.locations.road_bg = Object.assign({}, roadCfg, { x: roadX, y: roadY, displayWidth: roadWidth });
         STORY_CONFIG.locations.jewel_building_bg = Object.assign({}, jewelCfg, { x: jewelX, y: jewelY, displayWidth: jewelWidth });
         STORY_CONFIG.locations.luxury_house_bg = Object.assign({}, houseCfg, { x: houseX, y: houseY, displayWidth: houseWidth });
         STORY_CONFIG.locations.simple_house_bg = Object.assign({}, locs.simple_house_bg || {}, { x: houseX, y: houseY, displayWidth: houseWidth });
@@ -108,47 +96,47 @@ export default class Game extends ParentScene {
         const portCfg = STORY_CONFIG?.portrait_multipliers || {};
         const landCfg = STORY_CONFIG?.landscape_multipliers || {};
         const currentMult = isPortrait ? portCfg : landCfg;
-        const groundY = STORY_CONFIG.ground_y || 285;
+        const groundY = STORY_CONFIG.ground_y || 355;
         const heroYOffset = currentMult?.hero_y_offset !== undefined 
             ? currentMult.hero_y_offset 
             : (STORY_CONFIG.hero_y_offset !== undefined ? STORY_CONFIG.hero_y_offset : 26);
 
-        const hero = new PuppetCharacter(this, roadX, groundY + heroYOffset, SKELETON_CONFIG, HERO_CONFIG);
+        const hero = new PuppetCharacter(this, jewelX, groundY + heroYOffset, SKELETON_CONFIG, HERO_CONFIG);
         hero.animator = new PuppetAnimator(this, hero);
         hero.setDepth(30);
         this.worldContainer.add(hero);
 
-        const girl1 = new PuppetCharacter(this, roadX - 420, groundY - 2, SKELETON_CONFIG, GIRL1_CONFIG);
+        const girl1 = new PuppetCharacter(this, jewelX - 420, groundY - 2, SKELETON_CONFIG, GIRL1_CONFIG);
         girl1.animator = new PuppetAnimator(this, girl1);
         girl1.setVisible(false);
         girl1.setDepth(21);
         this.worldContainer.add(girl1);
 
-        const friend1 = new PuppetCharacter(this, roadX - 490, groundY - 16, SKELETON_CONFIG, FRIEND1_CONFIG);
+        const friend1 = new PuppetCharacter(this, jewelX - 490, groundY - 16, SKELETON_CONFIG, FRIEND1_CONFIG);
         friend1.animator = new PuppetAnimator(this, friend1);
         friend1.setVisible(false);
         friend1.setDepth(17);
         this.worldContainer.add(friend1);
 
-        const friend2 = new PuppetCharacter(this, roadX - 560, groundY + 6, SKELETON_CONFIG, FRIEND2_CONFIG);
+        const friend2 = new PuppetCharacter(this, jewelX - 560, groundY + 6, SKELETON_CONFIG, FRIEND2_CONFIG);
         friend2.animator = new PuppetAnimator(this, friend2);
         friend2.setVisible(false);
         friend2.setDepth(23);
         this.worldContainer.add(friend2);
 
-        const friend3 = new PuppetCharacter(this, roadX + 420, groundY - 13, SKELETON_CONFIG, FRIEND3_CONFIG);
+        const friend3 = new PuppetCharacter(this, jewelX + 420, groundY - 13, SKELETON_CONFIG, FRIEND3_CONFIG);
         friend3.animator = new PuppetAnimator(this, friend3);
         friend3.setVisible(false);
         friend3.setDepth(18);
         this.worldContainer.add(friend3);
 
-        const friend4 = new PuppetCharacter(this, roadX + 490, groundY + 9, SKELETON_CONFIG, FRIEND4_CONFIG);
+        const friend4 = new PuppetCharacter(this, jewelX + 490, groundY + 9, SKELETON_CONFIG, FRIEND4_CONFIG);
         friend4.animator = new PuppetAnimator(this, friend4);
         friend4.setVisible(false);
         friend4.setDepth(25);
         this.worldContainer.add(friend4);
 
-        const friend5 = new PuppetCharacter(this, roadX + 560, groundY - 9, SKELETON_CONFIG, FRIEND5_CONFIG);
+        const friend5 = new PuppetCharacter(this, jewelX + 560, groundY - 9, SKELETON_CONFIG, FRIEND5_CONFIG);
         friend5.animator = new PuppetAnimator(this, friend5);
         friend5.setVisible(false);
         friend5.setDepth(19);
@@ -160,10 +148,10 @@ export default class Game extends ParentScene {
         man1.setDepth(20);
         this.worldContainer.add(man1);
 
-        const girl2 = new PuppetCharacter(this, houseX + 360, groundY, SKELETON_CONFIG, GIRL2_CONFIG);
+        const girl2 = new PuppetCharacter(this, houseX + 360, groundY + heroYOffset + 38, SKELETON_CONFIG, GIRL2_CONFIG);
         girl2.animator = new PuppetAnimator(this, girl2);
         girl2.setVisible(false);
-        girl2.setDepth(35);
+        girl2.setDepth(28);
         this.worldContainer.add(girl2);
 
         const clown = new PuppetCharacter(this, houseX + 800, groundY, SKELETON_CONFIG, CLOWN_CONFIG);
@@ -185,7 +173,7 @@ export default class Game extends ParentScene {
             { puppet: friend4, facing: -1, baseTargetOffsetX: 210, baseYOffset: 9 },
             { puppet: friend5, facing: -1, baseTargetOffsetX: 310, baseYOffset: -9 },
             { puppet: man1, facing: -1, baseTargetOffsetX: 360, baseYOffset: 0 },
-            { puppet: girl2, facing: -1, baseTargetOffsetX: 360, baseYOffset: 76 },
+            { puppet: girl2, facing: -1, baseTargetOffsetX: 360, baseYOffset: heroYOffset + 38 },
             { puppet: clown, facing: -1, baseTargetOffsetX: 750, baseYOffset: 76 }
         ];
 
@@ -229,11 +217,23 @@ export default class Game extends ParentScene {
         this.choiceGroup.ignoreResize = true;
         this.mainContainer.add(this.choiceGroup);
 
+        // Dedicated finale UI container decoupled from main camera zoom
+        this.finaleContainer = this.add.container(0, 0);
+        this.finaleContainer.setDepth(170);
+        this.mainContainer.add(this.finaleContainer);
+
         this.finalWindow = new FinalWindow({
             scene: this,
-            container: this.mainContainer,
+            container: this.finaleContainer,
             onCta: () => this._onCta()
         });
+
+        // Dedicated non-zoomed UI camera for FinalWindow and finale CTA buttons
+        this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
+        this.uiCamera.setScroll(0, 0);
+        this.uiCamera.setZoom(1.0);
+        this.uiCamera.ignore([this.worldContainer, this.balanceView, this.choiceGroup]);
+        this.cameras.main.ignore(this.finaleContainer);
 
         // 5. Story Controller
         this.storyController = new StoryController(this, STORY_CONFIG, puppetsMap, {
@@ -245,14 +245,14 @@ export default class Game extends ParentScene {
                 const tex = (choiceId === 'choice_simple') ? 'simple_house_bg' : 'luxury_house_bg';
                 const chosenCfg = locs[tex] || houseCfg;
                 const chosenShift = getShift(chosenCfg);
-                const currentScaleX = this.roadBg ? this.roadBg.scaleX : (getScale(chosenCfg, 1.5625).x);
-                const currentScaleY = this.roadBg ? this.roadBg.scaleY : (getScale(chosenCfg, 1.5625).y);
+                const currentScaleX = this.jewelBg ? this.jewelBg.scaleX : (getScale(chosenCfg, 1.5625).x);
+                const currentScaleY = this.jewelBg ? this.jewelBg.scaleY : (getScale(chosenCfg, 1.5625).y);
                 const chosenBaseWidth = this.textures.get(tex)?.getSourceImage()?.width || 988;
                 const chosenWidth = chosenBaseWidth * currentScaleX;
                 const currentJewelX = STORY_CONFIG.locations.jewel_building_bg?.x || jewelX;
                 const currentJewelWidth = STORY_CONFIG.locations.jewel_building_bg?.displayWidth || jewelWidth;
                 const currentHouseX = currentJewelX + (currentJewelWidth / 2) + (chosenWidth / 2) + chosenShift.x;
-                const currentHouseY = this.roadBg ? this.roadBg.y : 0;
+                const currentHouseY = this.jewelBg ? this.jewelBg.y : 0;
 
                 if (this.houseBg) {
                     this.houseBg.setTexture(tex);
@@ -279,6 +279,13 @@ export default class Game extends ParentScene {
         const height = this.scale.height;
         if (!width || !height) return;
 
+        if (this.uiCamera) {
+            this.uiCamera.setViewport(0, 0, width, height);
+            this.uiCamera.setSize(width, height);
+            this.uiCamera.setScroll(0, 0);
+            this.uiCamera.setZoom(1.0);
+        }
+
         // Cleanly resolve and fast-forward in-flight transitions on orientation/resize change before layout recalculation
         if (this.storyController && this.storyController.isTransitioning) {
             this.storyController.fastForwardTransition();
@@ -292,7 +299,6 @@ export default class Game extends ParentScene {
         const screenHeight = height / appScale;
 
         const locs = STORY_CONFIG?.locations || {};
-        const roadCfg = locs.road_bg || {};
         const portCfg = STORY_CONFIG?.portrait_multipliers || {};
         const landCfg = STORY_CONFIG?.landscape_multipliers || {};
 
@@ -311,16 +317,17 @@ export default class Game extends ParentScene {
         // The whole worldContainer is scaled so the background covers the screen:
         //  - portrait: fit background height to screen height
         //  - landscape: fit background width to screen width
-        const roadBaseWidth = this.textures.get('road_bg')?.getSourceImage()?.width || 988;
-        const roadBaseHeight = this.textures.get('road_bg')?.getSourceImage()?.height || 982;
+        const jewelCfg = locs.jewel_building_bg || {};
+        const jewelBaseWidth = this.textures.get('jewel_building_bg')?.getSourceImage()?.width || 988;
+        const jewelBaseHeight = this.textures.get('jewel_building_bg')?.getSourceImage()?.height || 982;
 
-        const roadScale = getScale(roadCfg, 1.5625);
-        const bgScaleX = roadScale.x;
-        const bgScaleY = roadScale.y;
+        const jewelScale = getScale(jewelCfg, 1.5625);
+        const bgScaleX = jewelScale.x;
+        const bgScaleY = jewelScale.y;
 
         const worldScale = isPortrait
-            ? screenHeight / (roadBaseHeight * bgScaleY)
-            : screenWidth / (roadBaseWidth * bgScaleX);
+            ? screenHeight / (jewelBaseHeight * bgScaleY)
+            : screenWidth / (jewelBaseWidth * bgScaleX);
 
         if (this.worldContainer) {
             this.worldContainer.setScale(worldScale);
@@ -328,19 +335,13 @@ export default class Game extends ParentScene {
 
         // All backgrounds share the same horizon: vertically centered in worldContainer (y = 0)
         const bgY = 0;
-        const roadShiftY = bgY;
-        const roadX = roadCfg.shift?.x || 0;
-        if (this.roadBg) {
-            this.roadBg.setScale(bgScaleX, bgScaleY);
-            this.roadBg.setPosition(roadX, bgY);
-        }
 
         // 2. Ground Baseline (groundY) calculation:
         // Single source of truth for character placement: distance (in texture px) from the
         // background center down to the sidewalk line where characters stand.
         // In 32% resolution assets (height ~982px, center at 491px), distance is 182.4px
         // (corresponding to 570px in 100% assets).
-        const rawGroundTexY = STORY_CONFIG?.ground_texture_y ?? 182.4;
+        const rawGroundTexY = STORY_CONFIG?.ground_texture_y ?? 227.2;
         const groundTexY = rawGroundTexY > 300 ? (rawGroundTexY * 0.32) : rawGroundTexY;
         const groundY = Math.round(bgY + (groundTexY * bgScaleY));
         STORY_CONFIG.ground_y = groundY;
@@ -350,19 +351,16 @@ export default class Game extends ParentScene {
             : (STORY_CONFIG?.hero_y_offset !== undefined ? STORY_CONFIG.hero_y_offset : 26);
         if (this.storyController) {
             this.storyController.groundY = groundY;
-            this.storyController.heroYOffset = heroYOffset;
             this.storyController.heroGroundY = groundY + heroYOffset;
+            this.storyController.girl2YOffset = 38;
+            this.storyController.girl2GroundY = groundY + heroYOffset + 38;
         }
 
         // 3. Update adjacent continuous horizontal backgrounds using identical anchoring logic
-        const roadWidth = roadBaseWidth * bgScaleX;
-
-        const jewelCfg = locs.jewel_building_bg || {};
-        const jewelBaseWidth = this.textures.get('jewel_building_bg')?.getSourceImage()?.width || 988;
         const jewelWidth = jewelBaseWidth * bgScaleX;
         const jewelShiftX = jewelCfg.shift?.x || 0;
         const jewelShiftY = bgY;
-        const jewelX = roadX + (roadWidth / 2) + (jewelWidth / 2) + jewelShiftX;
+        const jewelX = 0 + jewelShiftX;
         if (this.jewelBg) {
             this.jewelBg.setScale(bgScaleX, bgScaleY);
             this.jewelBg.setPosition(jewelX, jewelShiftY);
@@ -382,7 +380,6 @@ export default class Game extends ParentScene {
         }
 
         // Publish updated coordinates into STORY_CONFIG.locations
-        STORY_CONFIG.locations.road_bg = Object.assign({}, roadCfg, { x: roadX, y: roadShiftY, displayWidth: roadWidth });
         STORY_CONFIG.locations.jewel_building_bg = Object.assign({}, jewelCfg, { x: jewelX, y: jewelShiftY, displayWidth: jewelWidth });
         STORY_CONFIG.locations.luxury_house_bg = Object.assign({}, locs.luxury_house_bg, { x: houseX, y: houseShiftY, displayWidth: houseWidth });
         STORY_CONFIG.locations.simple_house_bg = Object.assign({}, locs.simple_house_bg, { x: houseX, y: houseShiftY, displayWidth: houseWidth });

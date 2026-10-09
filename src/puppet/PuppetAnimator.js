@@ -42,6 +42,38 @@ export default class PuppetAnimator {
         }
     }
 
+    playCry() {
+        this.stopAll();
+        this.isWalking = false;
+
+        const body = this.puppet.bones?.body;
+        if (body && body.initial) {
+            const bodyCry = this.scene.tweens.add({
+                targets: body,
+                y: body.initial.y + 6,
+                scaleY: body.initial.scaleY * 0.95,
+                duration: 400,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Quad.easeInOut'
+            });
+            this.activeTweens.push(bodyCry);
+        }
+
+        const head = this.puppet.bones?.head;
+        if (head && head.initial) {
+            const headCry = this.scene.tweens.add({
+                targets: head,
+                angle: 10,
+                duration: 500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            this.activeTweens.push(headCry);
+        }
+    }
+
     playWalk(options = {}) {
         this.stopAll();
         this.isWalking = true;
