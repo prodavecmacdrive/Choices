@@ -13,9 +13,30 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
         this.balanceView = balanceView || scene?.balanceView || null;
         this.cards = [];
         this.isSelecting = false;
+        this.choiceGroupContainer = this;
+        const isPortrait = scene.scale ? (scene.scale.width < scene.scale.height) : true;
+        this.uiScale = this.getScaleSetting(isPortrait);
+        this.setScale(this.uiScale);
+        this._customPosY = null;
+        this._lastLayout = null;
+        this.helperHand = null;
+        this.helperHandTimer = null;
+        this.helperHandSequenceTimer = null;
+        this._onlyAffordable = false;
         this.setDepth(160);
 
         scene.add.existing(this);
+    }
+
+    getScaleSetting(isPortrait) {
+        const groupScaleCfg = UI_CONFIG?.choice_group?.scale;
+        if (typeof groupScaleCfg === 'object' && groupScaleCfg !== null) {
+            return isPortrait ? (groupScaleCfg.portrait ?? 1.0) : (groupScaleCfg.landscape ?? 1.0);
+        }
+        if (typeof groupScaleCfg === 'number') {
+            return groupScaleCfg;
+        }
+        return 1.0;
     }
 
     setBalanceView(balanceView) {
@@ -29,12 +50,22 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
     showChoices(choicesArray, options = {}) {
         this.clearCards();
         this.isSelecting = false;
+        this._customPosY = (typeof options.y === 'number') ? options.y : null;
+        this._clearHelperHand();
+        this._onlyAffordable = false;
 
         if (options.balanceView) {
             this.balanceView = options.balanceView;
         }
 
         if (!choicesArray || choicesArray.length === 0) return;
+
+        // Prompt user with helper hand if no selection made within 4 seconds
+        this.helperHandTimer = this.scene.time.delayedCall(4000, () => {
+            if (!this.isSelecting && this.cards.length > 0) {
+                this._startHelperHand();
+            }
+        });
 
         try {
             Utils.addAudio(this.scene, 'ui_popup', 0.9);
@@ -66,7 +97,10 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
             const cardX = startX + index * spacing;
             const card = this.scene.add.container(cardX, posY);
             card.baseX = cardX;
+            card.choiceData = choice;
             card._isShaking = false;
+            const cardBaseScale = (typeof cardCfg.scale === 'number') ? cardCfg.scale : 1.0;
+            card.cardBaseScale = cardBaseScale;
             card.setScale(0);
 
             // 1. Choice card frame
@@ -160,12 +194,12 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
             // Click handling
             frame.on('pointerdown', () => {
                 if (this.isSelecting) return;
-                card.setScale(0.94);
+                card.setScale((card.cardBaseScale || 1) * 0.94);
             });
 
             frame.on('pointerout', () => {
                 if (!this.isSelecting) {
-                    card.setScale(1);
+                    card.setScale(card.cardBaseScale || 1);
                 }
             });
 
@@ -178,7 +212,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
 
                 // Insufficient funds handling: no interactive locks, repeatable on every click
                 if (itemCost > 0 && currentBalance < itemCost) {
-                    card.setScale(1);
+                    card.setScale(card.cardBaseScale || 1);
 
                     try {
                         Utils.addAudio(this.scene, 'error', 1.0);
@@ -189,11 +223,16 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
                     if (balanceView && typeof balanceView.flashInsufficientFunds === 'function') {
                         balanceView.flashInsufficientFunds();
                     }
+
+                    // User clicked unaffordable button: helper hand appears immediately and shows only affordable choice
+                    this._onlyAffordable = true;
+                    this._startHelperHand();
                     return;
                 }
 
                 // Normal purchase flow on sufficient funds
                 this.isSelecting = true;
+                this._clearHelperHand();
                 this.disableAllInteractivity();
 
                 try {
@@ -202,8 +241,8 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
 
                 this.scene.tweens.add({
                     targets: card,
-                    scaleX: 1.08,
-                    scaleY: 1.08,
+                    scaleX: (card.cardBaseScale || 1) * 1.08,
+                    scaleY: (card.cardBaseScale || 1) * 1.08,
                     duration: 120,
                     yoyo: true,
                     ease: 'Sine.easeOut',
@@ -223,13 +262,21 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
             // Animate card entrance
             this.scene.tweens.add({
                 targets: card,
-                scaleX: 1,
-                scaleY: 1,
+                scaleX: card.cardBaseScale || 1,
+                scaleY: card.cardBaseScale || 1,
                 duration: 350,
                 delay: index * 90,
                 ease: 'Back.easeOut'
             });
         });
+
+        // Adapt layout and scale immediately to active camera framing and viewport dimensions
+        const appScale = Math.min(this.scene.scale.width / 600, this.scene.scale.height / 900) || 1;
+        const screenWidth = this.scene.scale.width / appScale;
+        const screenHeight = this.scene.scale.height / appScale;
+        const camZoom = this.scene?.cameras?.main?.zoom || 1.0;
+        const camOffsetY = this.scene?.cameras?.main?.scrollY || 0;
+        this.updateLayout(isPortrait, screenWidth, screenHeight, { zoom: camZoom, offsetY: camOffsetY, appScale });
     }
 
     _playCardInsufficientFunds(card) {
@@ -244,7 +291,8 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
 
         const baseX = card.baseX !== undefined ? card.baseX : card.x;
         card.x = baseX;
-        card.setScale(1);
+        const baseScale = card.cardBaseScale || 1;
+        card.setScale(baseScale);
 
         // 1. Red Flash on card frame & price text
         if (card.frame && typeof card.frame.setTint === 'function') {
@@ -291,6 +339,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
     }
 
     clearCards() {
+        this._clearHelperHand();
         this.cards.forEach((card) => {
             if (card._resetTimer) {
                 card._resetTimer.remove();
@@ -302,27 +351,62 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
         this.cards = [];
     }
 
-    updateLayout(isPortrait, screenWidth, screenHeight) {
+    updateLayout(isPortrait, screenWidth, screenHeight, cameraContext = null) {
+        this._lastLayout = { isPortrait, screenWidth, screenHeight, cameraContext };
+
         const groupCfg = UI_CONFIG?.choice_group || {};
         const posCfg = groupCfg.position || {};
-        const posX = isPortrait ? (posCfg.portrait?.x ?? posCfg.x ?? 300) : (posCfg.landscape?.x ?? posCfg.x ?? 300);
-        const posY = isPortrait ? (posCfg.portrait?.y ?? posCfg.y ?? 150) : (posCfg.landscape?.y ?? posCfg.y ?? 140);
-        this.setPosition(posX, posY);
+        const basePosX = isPortrait ? (posCfg.portrait?.x ?? posCfg.x ?? 300) : (posCfg.landscape?.x ?? posCfg.x ?? 300);
+        const basePosY = isPortrait ? (posCfg.portrait?.y ?? posCfg.y ?? 150) : (posCfg.landscape?.y ?? posCfg.y ?? 140);
+
+        const camZoom = (cameraContext && typeof cameraContext.zoom === 'number') ? cameraContext.zoom : (this.scene?.cameras?.main?.zoom || 1.0);
+        const camOffsetY = (cameraContext && typeof cameraContext.offsetY === 'number') ? cameraContext.offsetY : (this.scene?.cameras?.main?.scrollY || 0);
+        const appScale = (cameraContext && typeof cameraContext.appScale === 'number') ? cameraContext.appScale : (this.scene?.mainContainer?.scaleX || 1.0);
+
+        const count = (this.cards && this.cards.length > 0) ? this.cards.length : 2;
+        const spacingCfg = groupCfg.spacing;
+        const baseSpacing = typeof spacingCfg === 'object'
+            ? (isPortrait ? (spacingCfg.portrait ?? 240) : (spacingCfg.landscape ?? 260))
+            : (isPortrait ? Math.min(spacingCfg ?? 260, 240) : (spacingCfg ?? 260));
+
+        // Available width in camera visible logical space with safe margins
+        const visibleWidth = screenWidth / camZoom;
+        const safePadding = 48;
+        const maxAvailableWidth = Math.max(200, visibleWidth - safePadding);
+
+        // Approximate total width of choice cards at scale 1.0
+        const cardFrameWidth = 226;
+        const totalBaseWidth = (count > 1 ? (count - 1) * baseSpacing : 0) + cardFrameWidth;
+
+        const configScale = this.getScaleSetting(isPortrait);
+        // Base proportionate visual scale linked to camera framing
+        const baseVisualScale = Math.max(0.75, Math.min(1.2, 1.0 + (camZoom - 1.0) * 0.25));
+        // Multiply by configuration scale (identical to balance container behavior)
+        const desiredVisualScale = baseVisualScale * configScale;
+        const uiScale = desiredVisualScale / camZoom;
+
+        this.uiScale = uiScale;
+        this.setScale(uiScale);
+        if (this.choiceGroupContainer && this.choiceGroupContainer !== this) {
+            this.choiceGroupContainer.setScale(uiScale);
+        }
+
+        // Relative anchoring: Centered horizontally and anchored in the upper-middle of visible camera frame
+        const logicalOffsetY = appScale > 0 ? (camOffsetY / appScale) : camOffsetY;
+        const centerY = 450 + logicalOffsetY;
+        const adaptedY = centerY + ((basePosY - 450) * uiScale) / camZoom;
+        const adaptedX = basePosX;
+
+        this.setPosition(adaptedX, adaptedY);
 
         if (this.cards && this.cards.length > 0) {
-            const count = this.cards.length;
-            const spacingCfg = groupCfg.spacing;
-            const spacing = typeof spacingCfg === 'object'
-                ? (isPortrait ? (spacingCfg.portrait ?? 240) : (spacingCfg.landscape ?? 260))
-                : (isPortrait ? Math.min(spacingCfg ?? 260, 240) : (spacingCfg ?? 260));
-
-            const startX = -((count - 1) * spacing) / 2;
+            const startX = -((count - 1) * baseSpacing) / 2;
             const defaultY = count === 1
                 ? (groupCfg.positions_y?.single ?? -145)
-                : (groupCfg.positions_y?.multiple ?? (isPortrait ? 190 : 205));
+                : (this._customPosY ?? (groupCfg.positions_y?.multiple ?? (isPortrait ? 190 : 205)));
 
             this.cards.forEach((card, index) => {
-                const cardX = startX + index * spacing;
+                const cardX = startX + index * baseSpacing;
                 card.baseX = cardX;
                 if (!card._isShaking) {
                     card.x = cardX;
@@ -333,6 +417,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
     }
 
     hide(duration = 200, onComplete = null) {
+        this._clearHelperHand();
         if (this.cards.length === 0) {
             if (onComplete) onComplete();
             return;
@@ -352,5 +437,161 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
                 if (onComplete) onComplete();
             }
         });
+    }
+
+    _startHelperHand() {
+        if (this.isSelecting || !this.cards || this.cards.length === 0) return;
+        if (!this.scene || !this.scene.textures.exists('helper_hand')) return;
+
+        if (this.helperHandSequenceTimer) {
+            this.helperHandSequenceTimer.remove();
+            this.helperHandSequenceTimer = null;
+        }
+        if (this.helperHand) {
+            this.scene.tweens.killTweensOf(this.helperHand);
+        }
+
+        const balanceView = this.getBalanceView();
+        const currentBalance = balanceView ? balanceView.getValue() : Infinity;
+
+        let targetCards = [];
+        if (this._onlyAffordable) {
+            targetCards = this.cards.filter(c => {
+                const cost = Number(c.choiceData?.price || 0);
+                return cost <= currentBalance;
+            });
+        }
+
+        if (targetCards.length === 0) {
+            targetCards = this.cards.slice();
+        }
+
+        if (targetCards.length === 0) return;
+
+        // Create or reuse helper hand sprite
+        if (!this.helperHand || !this.helperHand.active) {
+            this.helperHand = this.scene.add.image(0, 0, 'helper_hand');
+            // Index finger points at top-left
+            this.helperHand.setOrigin(0.12, 0.05);
+            const handScale = 0.44;
+            this.helperHand.handBaseScale = handScale;
+            this.helperHand.setScale(handScale);
+            this.helperHand.setDepth(200);
+            this.add(this.helperHand);
+
+            const firstCard = targetCards[0];
+            this.helperHand.setPosition(firstCard.x + 35, firstCard.y + 60);
+            this.helperHand.setAlpha(0);
+        }
+
+        this._runHelperHandLoop(targetCards, 0);
+    }
+
+    _runHelperHandLoop(targetCards, index = 0) {
+        if (this.isSelecting || !this.helperHand || !this.helperHand.active) return;
+        if (!targetCards || targetCards.length === 0) return;
+
+        const card = targetCards[index % targetCards.length];
+        if (!card || !card.active) return;
+
+        const targetX = card.x + 20;
+        const targetY = card.y + 25;
+        const baseScale = this.helperHand.handBaseScale || 0.44;
+
+        // 1. Move hand to button
+        this.scene.tweens.add({
+            targets: this.helperHand,
+            x: targetX,
+            y: targetY,
+            alpha: 1,
+            duration: 380,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+                if (this.isSelecting || !this.helperHand || !this.helperHand.active) return;
+
+                // 2. Simulate click: press hand down and button down
+                this.scene.tweens.add({
+                    targets: this.helperHand,
+                    scaleX: baseScale * 0.86,
+                    scaleY: baseScale * 0.86,
+                    y: targetY + 10,
+                    duration: 130,
+                    ease: 'Quad.easeInOut'
+                });
+
+                this.scene.tweens.add({
+                    targets: card,
+                    scaleX: (card.cardBaseScale || 1) * 0.94,
+                    scaleY: (card.cardBaseScale || 1) * 0.94,
+                    duration: 130,
+                    ease: 'Quad.easeInOut',
+                    onComplete: () => {
+                        if (this.isSelecting || !this.helperHand || !this.helperHand.active) return;
+
+                        // Release simulated click
+                        this.scene.tweens.add({
+                            targets: this.helperHand,
+                            scaleX: baseScale,
+                            scaleY: baseScale,
+                            y: targetY,
+                            duration: 150,
+                            ease: 'Quad.easeInOut'
+                        });
+
+                        this.scene.tweens.add({
+                            targets: card,
+                            scaleX: card.cardBaseScale || 1,
+                            scaleY: card.cardBaseScale || 1,
+                            duration: 150,
+                            ease: 'Quad.easeInOut',
+                            onComplete: () => {
+                                if (this.isSelecting || !this.helperHand || !this.helperHand.active) return;
+
+                                // Pause before moving to next target
+                                this.helperHandSequenceTimer = this.scene.time.delayedCall(450, () => {
+                                    if (this.isSelecting || !this.helperHand || !this.helperHand.active) return;
+
+                                    let currentTargets = targetCards;
+                                    if (this._onlyAffordable) {
+                                        const balanceView = this.getBalanceView();
+                                        const curBal = balanceView ? balanceView.getValue() : Infinity;
+                                        currentTargets = this.cards.filter(c => {
+                                            const cost = Number(c.choiceData?.price || 0);
+                                            return cost <= curBal;
+                                        });
+                                        if (currentTargets.length === 0) currentTargets = this.cards.slice();
+                                    }
+
+                                    this._runHelperHandLoop(currentTargets, index + 1);
+                                });
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    _clearHelperHand() {
+        if (this.helperHandTimer) {
+            this.helperHandTimer.remove();
+            this.helperHandTimer = null;
+        }
+        if (this.helperHandSequenceTimer) {
+            this.helperHandSequenceTimer.remove();
+            this.helperHandSequenceTimer = null;
+        }
+        if (this.helperHand) {
+            this.scene.tweens.killTweensOf(this.helperHand);
+            this.helperHand.destroy();
+            this.helperHand = null;
+        }
+        if (this.cards) {
+            this.cards.forEach(card => {
+                if (card && !card._isShaking && !this.isSelecting) {
+                    card.setScale(card.cardBaseScale || 1);
+                }
+            });
+        }
     }
 }

@@ -97,8 +97,8 @@ export default class Game extends ParentScene {
         const landCfg = STORY_CONFIG?.landscape_multipliers || {};
         const currentMult = isPortrait ? portCfg : landCfg;
         const groundY = STORY_CONFIG.ground_y || 355;
-        const heroYOffset = currentMult?.hero_y_offset !== undefined 
-            ? currentMult.hero_y_offset 
+        const heroYOffset = currentMult?.hero_y_offset !== undefined
+            ? currentMult.hero_y_offset
             : (STORY_CONFIG.hero_y_offset !== undefined ? STORY_CONFIG.hero_y_offset : 26);
 
         const hero = new PuppetCharacter(this, jewelX, groundY + heroYOffset, SKELETON_CONFIG, HERO_CONFIG);
@@ -213,6 +213,7 @@ export default class Game extends ParentScene {
         const groupX = groupPos.x !== undefined ? groupPos.x : 300;
         const groupY = groupPos.y !== undefined ? groupPos.y : 150;
         this.choiceGroup = new ChoiceGroup(this, groupX, groupY, null, this.balanceView);
+        this.choiceGroupContainer = this.choiceGroup;
         this.choiceGroup.setDepth(160);
         this.choiceGroup.ignoreResize = true;
         this.mainContainer.add(this.choiceGroup);
@@ -268,7 +269,8 @@ export default class Game extends ParentScene {
             }
         });
 
-        // Initialize world scale, ground-level anchoring, and crowd layout for current orientation
+        // Initialize world scale, ground-level anchoring, camera settings, and crowd layout for current orientation
+        this.applyCameraSettings();
         this.onResize();
 
         this.storyController.start();
@@ -278,6 +280,11 @@ export default class Game extends ParentScene {
         const width = this.scale.width;
         const height = this.scale.height;
         if (!width || !height) return;
+
+        const isPortrait = width < height;
+
+        // Apply camera configuration directly to main camera
+        const { zoom: camZoom, offsetY: camOffsetY } = this.applyCameraSettings();
 
         if (this.uiCamera) {
             this.uiCamera.setViewport(0, 0, width, height);
@@ -291,7 +298,6 @@ export default class Game extends ParentScene {
             this.storyController.fastForwardTransition();
         }
 
-        const isPortrait = width < height;
         const appScale = Math.min(width / 600, height / 900);
         if (!appScale) return;
 
@@ -352,8 +358,8 @@ export default class Game extends ParentScene {
         if (this.storyController) {
             this.storyController.groundY = groundY;
             this.storyController.heroGroundY = groundY + heroYOffset;
-            this.storyController.girl2YOffset = 38;
-            this.storyController.girl2GroundY = groundY + heroYOffset + 38;
+            this.storyController.girl2YOffset = 28;
+            this.storyController.girl2GroundY = groundY + heroYOffset + 28;
         }
 
         // 3. Update adjacent continuous horizontal backgrounds using identical anchoring logic
@@ -389,13 +395,42 @@ export default class Game extends ParentScene {
             this.storyController.updateLayout(isPortrait);
         }
 
-        // 5. Update UI elements layout
+        // 5. Update UI elements layout (proportionately scaled and anchored to camera framing)
+        const cameraContext = {
+            zoom: camZoom,
+            offsetY: camOffsetY,
+            appScale: appScale
+        };
+
         if (this.balanceView && typeof this.balanceView.updateLayout === 'function') {
-            this.balanceView.updateLayout(isPortrait, screenWidth, screenHeight);
+            this.balanceView.updateLayout(isPortrait, screenWidth, screenHeight, cameraContext);
         }
         if (this.choiceGroup && typeof this.choiceGroup.updateLayout === 'function') {
-            this.choiceGroup.updateLayout(isPortrait, screenWidth, screenHeight);
+            this.choiceGroup.updateLayout(isPortrait, screenWidth, screenHeight, cameraContext);
         }
+    }
+
+    getCameraSettings(isPortrait) {
+        const camSettings = this.SETTINGS?.cameraSettings || STORY_CONFIG?.cameraSettings;
+        const camCfg = isPortrait
+            ? (camSettings?.portrait || { zoom: 1.0, offsetY: 0 })
+            : (camSettings?.landscape || { zoom: 1.0, offsetY: 0 });
+
+        const zoom = (typeof camCfg.zoom === 'number') ? camCfg.zoom : 1.0;
+        const offsetY = (typeof camCfg.offsetY === 'number') ? camCfg.offsetY : 0;
+        return { zoom, offsetY };
+    }
+
+    applyCameraSettings() {
+        const isPortrait = this.scale.width < this.scale.height;
+        const { zoom, offsetY } = this.getCameraSettings(isPortrait);
+
+        if (this.cameras?.main) {
+            this.cameras.main.setZoom(zoom);
+            this.cameras.main.scrollY = offsetY;
+        }
+
+        return { zoom, offsetY, isPortrait };
     }
 
     _onCta() {

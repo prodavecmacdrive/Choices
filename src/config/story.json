@@ -1,4 +1,5 @@
 {
+    "enablePartyFX": false,
     "start_balance": 500000,
     "start_step": "step_intro",
     "walk_speed": 500,

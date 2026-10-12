@@ -1,4 +1,15 @@
 {
+  "enablePartyFX": false,
+  "cameraSettings": {
+    "portrait": {
+      "zoom": 1.3,
+      "offsetY": 0
+    },
+    "landscape": {
+      "zoom": 1.3,
+      "offsetY": 290
+    }
+  },
   "economy": {
     "start_balance": 500000,
     "business_center_cost": 400000,

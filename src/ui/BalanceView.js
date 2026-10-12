@@ -15,12 +15,26 @@ export default class BalanceView extends Phaser.GameObjects.Container {
 
         this.ignoreResize = true;
         this.baseX = posX;
+        const isPortrait = scene.scale ? (scene.scale.width < scene.scale.height) : true;
+        this.uiScale = this.getScaleSetting(isPortrait);
         this.setPosition(posX, posY);
+        this.setScale(this.uiScale);
         this.setDepth(150);
 
         this._buildUI();
 
         scene.add.existing(this);
+    }
+
+    getScaleSetting(isPortrait) {
+        const balScaleCfg = UI_CONFIG?.balance?.scale;
+        if (typeof balScaleCfg === 'object' && balScaleCfg !== null) {
+            return isPortrait ? (balScaleCfg.portrait ?? 1.0) : (balScaleCfg.landscape ?? 1.0);
+        }
+        if (typeof balScaleCfg === 'number') {
+            return balScaleCfg;
+        }
+        return 1.0;
     }
 
     _buildUI() {
@@ -85,21 +99,34 @@ export default class BalanceView extends Phaser.GameObjects.Container {
         this.add(this.balanceText);
     }
 
-    updateLayout(isPortrait, screenWidth, screenHeight) {
+    updateLayout(isPortrait, screenWidth, screenHeight, cameraContext = null) {
         const balCfg = UI_CONFIG?.balance?.position || {};
-        let targetX = 450;
-        let targetY = 120;
+        const configScale = this.getScaleSetting(isPortrait);
 
-        if (isPortrait) {
-            targetX = balCfg.portrait?.x ?? balCfg.x ?? 440;
-            targetY = balCfg.portrait?.y ?? balCfg.y ?? 120;
-        } else {
-            targetX = balCfg.landscape?.x ?? balCfg.x ?? 460;
-            targetY = balCfg.landscape?.y ?? balCfg.y ?? 80;
-        }
+        const camZoom = (cameraContext && typeof cameraContext.zoom === 'number') ? cameraContext.zoom : (this.scene?.cameras?.main?.zoom || 1.0);
+        const camOffsetY = (cameraContext && typeof cameraContext.offsetY === 'number') ? cameraContext.offsetY : (this.scene?.cameras?.main?.scrollY || 0);
+        const appScale = (cameraContext && typeof cameraContext.appScale === 'number') ? cameraContext.appScale : (this.scene?.mainContainer?.scaleX || 1.0);
 
-        this.baseX = targetX;
-        this.setPosition(targetX, targetY);
+        // Proportionate visual scaling linked to camera zoom, multiplied with orientation-specific config scale
+        const baseVisualScale = Math.max(0.75, Math.min(1.2, 1.0 + (camZoom - 1.0) * 0.25));
+        const desiredVisualScale = baseVisualScale * configScale;
+        const uiScale = desiredVisualScale / camZoom;
+        this.uiScale = uiScale;
+        this.setScale(uiScale);
+
+        // Relative anchoring: Top-Right of the visible camera frame
+        const logicalOffsetY = appScale > 0 ? (camOffsetY / appScale) : camOffsetY;
+        const topEdge = 450 + logicalOffsetY - (screenHeight / (2 * camZoom));
+        const rightEdge = 300 + (screenWidth / (2 * camZoom));
+
+        const baseMarginTop = isPortrait ? (balCfg.portrait?.y ?? balCfg.y ?? 120) : (balCfg.landscape?.y ?? balCfg.y ?? 80);
+        const baseMarginRight = isPortrait ? (600 - (balCfg.portrait?.x ?? balCfg.x ?? 440)) : (600 - (balCfg.landscape?.x ?? balCfg.x ?? 460));
+
+        const adaptedX = rightEdge - (baseMarginRight * uiScale);
+        const adaptedY = topEdge + (baseMarginTop * uiScale);
+
+        this.baseX = adaptedX;
+        this.setPosition(adaptedX, adaptedY);
     }
 
     formatCash(val) {
@@ -139,16 +166,17 @@ export default class BalanceView extends Phaser.GameObjects.Container {
 
         // Plate bounce animation
         this.scene.tweens.killTweensOf(this);
-        this.setScale(1);
+        const baseScale = this.uiScale || 1;
+        this.setScale(baseScale);
         this.scene.tweens.add({
             targets: this,
-            scaleX: 1.08,
-            scaleY: 1.08,
+            scaleX: baseScale * 1.08,
+            scaleY: baseScale * 1.08,
             duration: 120,
             yoyo: true,
             ease: 'Sine.easeOut',
             onComplete: () => {
-                this.setScale(1);
+                this.setScale(baseScale);
             }
         });
 
@@ -250,7 +278,7 @@ export default class BalanceView extends Phaser.GameObjects.Container {
         // Strictly restore resting base coordinates & scale immediately
         const restingX = this.baseX !== undefined ? this.baseX : this.x;
         this.x = restingX;
-        this.setScale(1);
+        this.setScale(this.uiScale || 1);
 
         // 1. Red Flash on plate, coin, and texts
         if (this.plateBg && typeof this.plateBg.setTint === 'function') {
@@ -310,8 +338,8 @@ export default class BalanceView extends Phaser.GameObjects.Container {
         const localIconX = iconCfg.x !== undefined ? iconCfg.x : -90;
         const localIconY = iconCfg.y !== undefined ? iconCfg.y : 0;
 
-        const originX = this.x + localIconX;
-        const originY = this.y + localIconY;
+        const originX = this.x + localIconX * (this.scaleX || 1);
+        const originY = this.y + localIconY * (this.scaleY || 1);
 
         const parent = this.parentContainer || this.scene;
         const count = 6;
@@ -356,8 +384,8 @@ export default class BalanceView extends Phaser.GameObjects.Container {
         const iconCfg = UI_CONFIG?.balance?.icon || {};
         const localIconX = iconCfg.x !== undefined ? iconCfg.x : -90;
         const localIconY = iconCfg.y !== undefined ? iconCfg.y : 0;
-        const targetX = this.x + localIconX;
-        const targetY = this.y + localIconY;
+        const targetX = this.x + localIconX * (this.scaleX || 1);
+        const targetY = this.y + localIconY * (this.scaleY || 1);
 
         const parent = this.parentContainer || this.scene;
         let arrivalsLeft = coinCount;

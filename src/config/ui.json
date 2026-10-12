@@ -1,5 +1,9 @@
 {
     "balance": {
+        "scale": {
+            "portrait": 1.2,
+            "landscape": 1.2
+        },
         "position": {
             "portrait": {
                 "x": 440,
@@ -58,6 +62,10 @@
         }
     },
     "choice_group": {
+        "scale": {
+            "portrait": 1.1,
+            "landscape": 1.1
+        },
         "position": {
             "portrait": {
                 "x": 300,

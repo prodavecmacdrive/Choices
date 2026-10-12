@@ -161,6 +161,112 @@ export default class PuppetAnimator {
         }
     }
 
+    playCartoonWalk(options = {}) {
+        this.stopAll();
+        this.isWalking = true;
+        this.puppet?.scene?.storyController?.startWalking(this.puppet);
+
+        const duration = (options.duration !== undefined && options.duration > 0) ? options.duration : 1400;
+        const speed = (options.speed !== undefined && options.speed > 0) ? options.speed : 1.1;
+        const cycleDuration = Math.round(400 / speed); // ms per full stride cycle (2 steps)
+        const phaseOffset = options.phaseOffset || 0;
+
+        const baseLegAngle = options.baseLegAngle !== undefined ? options.baseLegAngle : 20;
+        const maxLegAngle = options.maxLegAngle !== undefined ? options.maxLegAngle : 29;
+        const baseArmAngle = options.baseArmAngle !== undefined ? options.baseArmAngle : 16;
+        const maxArmAngle = options.maxArmAngle !== undefined ? options.maxArmAngle : 24;
+        const baseBounce = options.baseBounce !== undefined ? options.baseBounce : 5;
+        const maxBounce = options.maxBounce !== undefined ? options.maxBounce : 8.5;
+        const maxHeadAngle = options.maxHeadAngle !== undefined ? options.maxHeadAngle : 3.5;
+        const maxBodyAngle = options.maxBodyAngle !== undefined ? options.maxBodyAngle : 2.5;
+
+        const legL = this.puppet.bones?.leg_upper_left;
+        const legR = this.puppet.bones?.leg_upper_right;
+        const armL = this.puppet.bones?.arm_left;
+        const armR = this.puppet.bones?.arm_right;
+        const body = this.puppet.bones?.body;
+        const head = this.puppet.bones?.head;
+
+        if (head) {
+            this.scene.tweens.killTweensOf(head);
+            head.angle = 0;
+        }
+        if (body) {
+            this.scene.tweens.killTweensOf(body);
+            body.angle = 0;
+        }
+
+        const bodyInitialY = body?.initial?.y ?? body?.y ?? 0;
+        const bodyInitialScaleX = body?.initial?.scaleX ?? body?.scaleX ?? 1;
+        const bodyInitialScaleY = body?.initial?.scaleY ?? body?.scaleY ?? 1;
+        const headInitialY = head?.initial?.y ?? head?.y ?? 0;
+
+        const progressTracker = { progress: 0 };
+        const walkTween = this.scene.tweens.add({
+            targets: progressTracker,
+            progress: 1,
+            duration: duration,
+            ease: 'Linear',
+            onUpdate: () => {
+                if (!this.puppet || !this.puppet.active) return;
+
+                const u = Math.min(Math.max(progressTracker.progress, 0), 1);
+
+                // Smooth bell curve envelope for cartoonishness: 0 at start -> 1 at midpoint -> 0 at finish
+                // This ensures cartoonishness gradually increases and gradually stops.
+                const cartoonEnvelope = Math.sin(Math.PI * u);
+
+                // Walk envelope: gentle ramp-in at the beginning and smooth ramp-down to 0 at arrival
+                // so the character eases to a clean stop without abrupt pose snaps
+                const walkFadeIn = Math.min(1, u / 0.15);
+                const walkFadeOut = Math.min(1, (1 - u) / 0.15);
+                const walkEnvelope = Math.min(walkFadeIn, walkFadeOut);
+
+                const currentLegAngle = (baseLegAngle + (maxLegAngle - baseLegAngle) * cartoonEnvelope) * walkEnvelope;
+                const currentArmAngle = (baseArmAngle + (maxArmAngle - baseArmAngle) * cartoonEnvelope) * walkEnvelope;
+                const currentBounce = (baseBounce + (maxBounce - baseBounce) * cartoonEnvelope) * walkEnvelope;
+                const currentHeadAngle = (maxHeadAngle * cartoonEnvelope) * walkEnvelope;
+                const currentBodyAngle = (maxBodyAngle * cartoonEnvelope) * walkEnvelope;
+                const currentSquash = 0.025 * cartoonEnvelope * walkEnvelope;
+
+                // Stride phase
+                const elapsedMs = u * duration;
+                const phase = (elapsedMs / cycleDuration) * Math.PI * 2 + phaseOffset;
+
+                const sinPhase = Math.sin(phase);
+                const bouncePhase = Math.abs(Math.sin(phase));
+
+                if (legL && legR) {
+                    legL.angle = -currentLegAngle * sinPhase;
+                    legR.angle = currentLegAngle * sinPhase;
+                }
+
+                if (armL && armR) {
+                    armL.angle = currentArmAngle * sinPhase;
+                    armR.angle = -currentArmAngle * sinPhase;
+                }
+
+                if (body) {
+                    body.y = bodyInitialY - currentBounce * bouncePhase;
+                    body.angle = currentBodyAngle * sinPhase;
+                    body.scaleY = bodyInitialScaleY * (1 + currentSquash * bouncePhase);
+                    body.scaleX = bodyInitialScaleX * (1 - currentSquash * bouncePhase);
+                }
+
+                if (head) {
+                    head.angle = currentHeadAngle * sinPhase;
+                    head.y = headInitialY + (cartoonEnvelope * 1.5 * bouncePhase);
+                }
+            },
+            onComplete: () => {
+                this.stopAll();
+                this.playIdle();
+            }
+        });
+
+        this.activeTweens.push(walkTween);
+    }
+
     playRun() {
         this.stopAll();
         this.isRunning = true;
@@ -1022,6 +1128,18 @@ export default class PuppetAnimator {
         if (this.puppet?.bones?.body) {
             this.scene.tweens.killTweensOf(this.puppet.bones.body);
             this.puppet.bones.body.angle = 0;
+        }
+        if (this.puppet?.bones?.arm_left) {
+            this.scene.tweens.killTweensOf(this.puppet.bones.arm_left);
+        }
+        if (this.puppet?.bones?.arm_right) {
+            this.scene.tweens.killTweensOf(this.puppet.bones.arm_right);
+        }
+        if (this.puppet?.bones?.leg_upper_left) {
+            this.scene.tweens.killTweensOf(this.puppet.bones.leg_upper_left);
+        }
+        if (this.puppet?.bones?.leg_upper_right) {
+            this.scene.tweens.killTweensOf(this.puppet.bones.leg_upper_right);
         }
     }
 }

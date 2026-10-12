@@ -24,6 +24,7 @@ export default class StoryController {
             ? currentMult.hero_y_offset
             : (this.story?.hero_y_offset !== undefined ? this.story.hero_y_offset : 26);
         this.heroGroundY = this.groundY + this.heroYOffset;
+        this.friendGroundY = this.heroGroundY - 26;
         this.girl2YOffset = 38;
         this.girl2GroundY = this.heroGroundY + this.girl2YOffset;
         this.chosenRing = null;
@@ -71,6 +72,22 @@ export default class StoryController {
                 this._celloSound = null;
             }
         });
+    }
+
+    get isPartyFXEnabled() {
+        if (this.scene?.SETTINGS?.enablePartyFX !== undefined) {
+            return !!this.scene.SETTINGS.enablePartyFX;
+        }
+        if (this.scene?.SETTINGS?.enableDiscoMode !== undefined) {
+            return !!this.scene.SETTINGS.enableDiscoMode;
+        }
+        if (this.story?.enablePartyFX !== undefined) {
+            return !!this.story.enablePartyFX;
+        }
+        if (this.story?.enableDiscoMode !== undefined) {
+            return !!this.story.enableDiscoMode;
+        }
+        return false;
     }
 
     startWalking(puppet) {
@@ -250,6 +267,7 @@ export default class StoryController {
     }
 
     _startPartyMusic() {
+        if (!this.isPartyFXEnabled) return;
         this.duckMainBgm(0, 800);
 
         if (this._partyMusic) {
@@ -281,6 +299,7 @@ export default class StoryController {
     }
 
     _stopPartyMusic() {
+        if (!this._partyMusic && !this._isStoppingPartyMusic) return;
         if (this._isStoppingPartyMusic) return;
         this._isStoppingPartyMusic = true;
 
@@ -375,7 +394,11 @@ export default class StoryController {
 
         if (this.scene?.cameras?.main) {
             this.scene.tweens.killTweensOf(this.scene.cameras.main);
-            this.scene.cameras.main.zoom = 1.0;
+            if (typeof this.scene.applyCameraSettings === 'function') {
+                this.scene.applyCameraSettings();
+            } else {
+                this.scene.cameras.main.zoom = 1.0;
+            }
         }
 
         if (transition.tweens && Array.isArray(transition.tweens)) {
@@ -515,9 +538,13 @@ export default class StoryController {
         this._stopAllWalkSounds();
         if (this.scene?.cameras?.main) {
             this.scene.tweens.killTweensOf(this.scene.cameras.main);
-            this.scene.cameras.main.zoom = 1.0;
-            this.scene.cameras.main.scrollX = 0;
-            this.scene.cameras.main.scrollY = 0;
+            if (typeof this.scene.applyCameraSettings === 'function') {
+                this.scene.applyCameraSettings();
+            } else {
+                this.scene.cameras.main.zoom = 1.0;
+                this.scene.cameras.main.scrollX = 0;
+                this.scene.cameras.main.scrollY = 0;
+            }
         }
         if (this.scene?.uiCamera) {
             this.scene.uiCamera.zoom = 1.0;
@@ -730,33 +757,103 @@ export default class StoryController {
                                             hero.animator?.stopAll();
                                             hero.scaleX = Math.abs(hero.scaleX || 1); // Face right again
 
-                                            // 3. Shaking stand & rapid arm waving
+                                            // 3. Shaking stand & high-rising rotating arms
+                                            const armL = hero.bones?.arm_left;
+                                            const armR = hero.bones?.arm_right;
+                                            const body = hero.bones?.body;
+                                            const bodyInitialY = body?.initial?.y ?? 0;
+                                            const armLInitialY = armL?.initial?.y ?? -30;
+                                            const armRInitialY = armR?.initial?.y ?? -30;
+
+                                            // Stand shakes energetically
                                             this.scene.tweens.add({
                                                 targets: this.building,
-                                                angle: 3,
-                                                duration: 80,
+                                                angle: 3.5,
+                                                duration: 60,
                                                 yoyo: true,
-                                                repeat: 20
+                                                repeat: -1,
+                                                ease: 'Sine.easeInOut'
                                             });
 
-                                            if (hero.bones?.arm_left) {
+                                            // Body bobs upwards with high energy behind counter
+                                            if (body) {
                                                 this.scene.tweens.add({
-                                                    targets: hero.bones.arm_left,
-                                                    angle: -100,
+                                                    targets: body,
+                                                    y: bodyInitialY - 20,
                                                     duration: 100,
                                                     yoyo: true,
-                                                    repeat: 16
+                                                    repeat: -1,
+                                                    ease: 'Sine.easeInOut'
                                                 });
                                             }
-                                            if (hero.bones?.arm_right) {
+
+                                            // Both arms rise high into the air and bob as they rotate
+                                            if (armL) {
+                                                armL.y = armLInitialY - 45;
                                                 this.scene.tweens.add({
-                                                    targets: hero.bones.arm_right,
-                                                    angle: -100,
-                                                    duration: 120,
+                                                    targets: armL,
+                                                    y: armLInitialY - 70, // Rises high above the stand
+                                                    duration: 140,
                                                     yoyo: true,
-                                                    repeat: 14
+                                                    repeat: -1,
+                                                    ease: 'Sine.easeInOut'
+                                                });
+                                                this.scene.tweens.add({
+                                                    targets: armL,
+                                                    angle: { from: 0, to: -360 }, // Full continuous rotation
+                                                    duration: 150,
+                                                    repeat: -1,
+                                                    ease: 'Linear'
                                                 });
                                             }
+
+                                            if (armR) {
+                                                armR.y = armRInitialY - 45;
+                                                this.scene.tweens.add({
+                                                    targets: armR,
+                                                    y: armRInitialY - 70, // Rises high above the stand
+                                                    duration: 140,
+                                                    yoyo: true,
+                                                    repeat: -1,
+                                                    ease: 'Sine.easeInOut'
+                                                });
+                                                this.scene.tweens.add({
+                                                    targets: armR,
+                                                    angle: { from: 180, to: 540 }, // Full continuous rotation offset by 180°
+                                                    duration: 150,
+                                                    repeat: -1,
+                                                    ease: 'Linear'
+                                                });
+                                            }
+
+                                            let workActive = true;
+                                            const stopStandWork = () => {
+                                                if (!workActive) return;
+                                                workActive = false;
+
+                                                if (this.building) {
+                                                    this.scene.tweens.killTweensOf(this.building);
+                                                    this.building.angle = 0;
+                                                }
+                                                if (armL) {
+                                                    this.scene.tweens.killTweensOf(armL);
+                                                }
+                                                if (armR) {
+                                                    this.scene.tweens.killTweensOf(armR);
+                                                }
+                                                if (body) {
+                                                    this.scene.tweens.killTweensOf(body);
+                                                }
+                                                hero.resetPose();
+                                                hero.animator?.stopAll();
+                                            };
+
+                                            // Fallback timeout ensuring stand work stops
+                                            this.scene.time.delayedCall(2400, () => {
+                                                if (workActive) {
+                                                    stopStandWork();
+                                                }
+                                            });
 
                                             // 4. Coin farming sequence
                                             const revenue = this.story?.steps?.step_lemonade_stand?.revenue ?? 750000;
@@ -778,20 +875,24 @@ export default class StoryController {
                                             const activeCrowd = friends.filter(c => !!c);
                                             const count = activeCrowd.length;
 
-                                            this._startPartyMusic();
-                                            this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
-                                            this.partyFX.start();
+                                            if (this.isPartyFXEnabled) {
+                                                this._startPartyMusic();
+                                                this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
+                                                this.partyFX.start();
+                                            }
 
                                             const danceStyles = ['sharp_jumps', 'wave_arms', 'throw_arms', 'step_raise', 'spins'];
-                                            const yLevels = [-26, -13, 0, 13, 26];
-                                            yLevels.sort(() => Math.random() - 0.5);
+                                            // Friends are placed higher along the game axis than hero (smaller Y, depths behind hero)
+                                            const yOffsets = [-12, -6, 0, 6, 10];
+                                            yOffsets.sort(() => Math.random() - 0.5);
 
                                             const placements = activeCrowd.map((p, idx) => {
                                                 const stepX = count > 1 ? (maxX - minX) / (count - 1) : 0;
                                                 const jitterX = (Math.random() - 0.5) * 20;
                                                 const targetX = Math.round(minX + idx * stepX + jitterX);
-                                                const yOffset = (yLevels[idx] !== undefined ? yLevels[idx] : 0) + (Math.random() - 0.5) * 6;
-                                                const targetY = Math.round(this.groundY + yOffset);
+                                                const yOffset = (yOffsets[idx] !== undefined ? yOffsets[idx] : 0) + (Math.random() - 0.5) * 4;
+                                                const targetY = Math.round(this.friendGroundY + yOffset);
+                                                p._groundY = targetY;
                                                 return {
                                                     puppet: p,
                                                     targetX,
@@ -822,119 +923,110 @@ export default class StoryController {
                                                     duration: 1200 + idx * 100,
                                                     ease: 'Power1.easeOut',
                                                     onComplete: () => {
-                                                        const style = danceStyles[idx % danceStyles.length];
-                                                        p.animator?.playDance({ style });
+                                                        if (this.isPartyFXEnabled) {
+                                                            const style = danceStyles[idx % danceStyles.length];
+                                                            p.animator?.playDance({ style });
+                                                        } else {
+                                                            p.resetPose();
+                                                            p.animator?.playIdle();
+                                                        }
                                                         arrivedCount++;
                                                         if (arrivedCount === activeCrowd.length) {
-                                                            // Friends are dancing, Hero exits to join the crowd
-                                                            this.scene.time.delayedCall(1500, () => {
-                                                                // Exit sequence: walk left of stand, weave down Y and across X with increasing Z-index into center of crowd
-                                                                const counterY = 215;
-                                                                hero.animator?.playWalk();
-                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
+                                                            // Work is finished: stop arm rotation immediately and restore clean pose
+                                                            stopStandWork();
 
-                                                                // 1. Move to the left of the lemonade stand behind counter (clearing the bench edge)
+                                                            // Friends are dancing, Hero smoothly exits to join the crowd weaving past friends
+                                                            this.scene.time.delayedCall(120, () => {
+                                                                const counterY = 215;
+                                                                hero.animator?.stopAll();
+                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
+                                                                hero.animator?.playWalk();
+                                                                hero.setDepth(19); // Behind counter
+
+                                                                const cCenter = crowdCenterX;
+
+                                                                // Dynamic depth update: change Hero's z-index only after he has passed a friend along the Y-axis
+                                                                const updateHeroDepth = () => {
+                                                                    let currentDepth = 21; // Baseline in front of stand (20) but behind all friends (22-26)
+                                                                    placements.forEach(item => {
+                                                                        const p = item.puppet;
+                                                                        if (p && p.visible !== false) {
+                                                                            // Only after hero has passed this friend along the y-axis
+                                                                            if (hero.y > item.targetY) {
+                                                                                currentDepth = Math.max(currentDepth, p.depth + 1);
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                    if (hero.y >= this.heroGroundY - 3) {
+                                                                        currentDepth = 30; // Final foreground depth
+                                                                    }
+                                                                    if (hero.depth !== currentDepth) {
+                                                                        hero.setDepth(currentDepth);
+                                                                        if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+                                                                            this.ui.worldContainer.sort('depth');
+                                                                        }
+                                                                    }
+                                                                };
+
+                                                                // Step 1: Move left behind counter to clear bench edge
                                                                 this.scene.tweens.add({
                                                                     targets: hero,
                                                                     x: -60,
                                                                     y: counterY,
-                                                                    duration: 450,
+                                                                    duration: 250,
                                                                     ease: 'Linear',
                                                                     onComplete: () => {
-                                                                        // Pass 1: to the right & down Y
-                                                                        hero.scaleX = Math.abs(hero.scaleX || 1);
-                                                                        hero.setDepth(23);
+                                                                        hero.setDepth(21);
                                                                         if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
 
+                                                                        // Pass 1: Weave left & down Y past initial friend boundary
+                                                                        hero.scaleX = -Math.abs(hero.scaleX || 1);
                                                                         this.scene.tweens.add({
                                                                             targets: hero,
-                                                                            x: 0,
-                                                                            y: this.groundY,
-                                                                            duration: 320,
+                                                                            x: cCenter - 45,
+                                                                            y: 275,
+                                                                            duration: 260,
                                                                             ease: 'Linear',
+                                                                            onUpdate: updateHeroDepth,
                                                                             onComplete: () => {
-                                                                                // Pass 2: to the left & down Y
-                                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
-                                                                                hero.setDepth(25);
-                                                                                if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
-
+                                                                                // Pass 2: Weave right & down Y between friends
+                                                                                hero.scaleX = Math.abs(hero.scaleX || 1);
                                                                                 this.scene.tweens.add({
                                                                                     targets: hero,
-                                                                                    x: -80,
-                                                                                    y: this.groundY + 15,
-                                                                                    duration: 380,
+                                                                                    x: cCenter + 45,
+                                                                                    y: 325,
+                                                                                    duration: 280,
                                                                                     ease: 'Linear',
+                                                                                    onUpdate: updateHeroDepth,
                                                                                     onComplete: () => {
-                                                                                        // Pass 3: to the right & down Y
-                                                                                        hero.scaleX = Math.abs(hero.scaleX || 1);
-                                                                                        hero.setDepth(27);
-                                                                                        if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
-
+                                                                                        // Pass 3: Weave left & down Y past remaining friends
+                                                                                        hero.scaleX = -Math.abs(hero.scaleX || 1);
                                                                                         this.scene.tweens.add({
                                                                                             targets: hero,
-                                                                                            x: -40,
-                                                                                            y: this.groundY + 28,
-                                                                                            duration: 300,
+                                                                                            x: cCenter - 30,
+                                                                                            y: 355,
+                                                                                            duration: 260,
                                                                                             ease: 'Linear',
+                                                                                            onUpdate: updateHeroDepth,
                                                                                             onComplete: () => {
-                                                                                                // Pass 4: to the left into crowd center in foreground
-                                                                                                hero.scaleX = -Math.abs(hero.scaleX || 1);
-                                                                                                hero.setDepth(30);
-                                                                                                if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
-
+                                                                                                // Pass 4: Settle right into crowd center foreground at heroGroundY
+                                                                                                hero.scaleX = Math.abs(hero.scaleX || 1);
                                                                                                 this.scene.tweens.add({
                                                                                                     targets: hero,
-                                                                                                    x: crowdCenterX,
-                                                                                                    y: this.groundY + 38,
-                                                                                                    duration: 480,
+                                                                                                    x: cCenter,
+                                                                                                    y: this.heroGroundY,
+                                                                                                    duration: 300,
                                                                                                     ease: 'Power1.easeOut',
+                                                                                                    onUpdate: updateHeroDepth,
                                                                                                     onComplete: () => {
+                                                                                                        hero.setDepth(30);
+                                                                                                        if (this.ui.worldContainer) this.ui.worldContainer.sort('depth');
                                                                                                         hero.scaleX = Math.abs(hero.scaleX || 1);
                                                                                                         hero.animator?.playIdle();
                                                                                                         hero.setFace('happy');
 
-                                                                                                        // Sequence Man 1 (realtor) entrance from the right before displaying House choice
-                                                                                                        const man1 = this.puppets.man_1;
-                                                                                                        if (man1) {
-                                                                                                            const worldScale = this.ui.worldContainer?.scaleX || 1;
-                                                                                                            const containerX = this.ui.worldContainer?.x ?? 300;
-                                                                                                            const screenRightLocal = (this.scene.scale.width - containerX) / worldScale;
-                                                                                                            const fromX = Math.max(Math.round(screenRightLocal + 120), 460);
-                                                                                                            const manTargetX = 240;
-
-                                                                                                            man1.setPosition(fromX, this.groundY);
-                                                                                                            const manScale = this._getCharacterScale(man1, -1);
-                                                                                                            man1.setScale(manScale.x, manScale.y);
-                                                                                                            man1.setVisible(true);
-                                                                                                            man1.resetPose();
-                                                                                                            man1.setDepth(24);
-                                                                                                            if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
-                                                                                                                this.ui.worldContainer.sort('depth');
-                                                                                                            }
-                                                                                                            man1.animator?.playWalk({ speed: 0.55 });
-
-                                                                                                            this.scene.tweens.add({
-                                                                                                                targets: man1,
-                                                                                                                x: manTargetX,
-                                                                                                                duration: 2000,
-                                                                                                                ease: 'Power1.easeOut',
-                                                                                                                onComplete: () => {
-                                                                                                                    man1.animator?.playIdle();
-                                                                                                                    try {
-                                                                                                                        Utils.addAudio(this.scene, 'voice_man_mumble', 1.0);
-                                                                                                                    } catch (e) { }
-
-                                                                                                                    // Display House choice cards ONLY after Man 1 reaches final idle position
-                                                                                                                    this.scene.time.delayedCall(400, () => {
-                                                                                                                        this.goToStep('step_choose_house');
-                                                                                                                    });
-                                                                                                                }
-                                                                                                            });
-                                                                                                        } else {
-                                                                                                            this.scene.time.delayedCall(400, () => {
-                                                                                                                this.goToStep('step_choose_house');
-                                                                                                            });
-                                                                                                        }
+                                                                                                        // Sequence Man 1 (realtor) entrance immediately from right edge
+                                                                                                        this._sequenceMan1Entrance(240);
                                                                                                     }
                                                                                                 });
                                                                                             }
@@ -960,6 +1052,65 @@ export default class StoryController {
             }
         });
     }
+
+    _sequenceMan1Entrance(manTargetX = 240) {
+        const man1 = this.puppets.man_1;
+        if (!man1) {
+            this.scene.time.delayedCall(250, () => {
+                this.goToStep('step_choose_house');
+            });
+            return;
+        }
+
+        const isPortrait = this.scene.scale.width < this.scene.scale.height;
+        let fromX = manTargetX + 185;
+        if (isPortrait) {
+            const worldScale = this.ui.worldContainer?.scaleX || 1;
+            const containerX = this.ui.worldContainer?.x ?? 0;
+            const cam = this.scene.cameras?.main;
+            const zoom = cam?.zoom || 1;
+            const halfVisWidth = (this.scene.scale.width / zoom) / 2;
+            const camCenterX = this.scene.scale.width / 2;
+            const visibleRightWorld = camCenterX + halfVisWidth;
+            const screenRightLocal = (visibleRightWorld - containerX) / worldScale;
+            // Ensure Man 1 starts just at/past the visible edge in portrait, capped so he never starts too far away
+            fromX = Math.round(Math.min(manTargetX + 210, Math.max(fromX, screenRightLocal + 35)));
+        }
+
+        const walkDist = Math.abs(fromX - manTargetX);
+        const walkDuration = Math.round((walkDist / 145) * 1000); // 145 px/sec natural walking velocity
+
+        this.scene.tweens.killTweensOf(man1);
+        man1.setPosition(fromX, this.groundY);
+        const manScale = this._getCharacterScale(man1, -1);
+        man1.setScale(manScale.x, manScale.y);
+        man1.setVisible(true);
+        man1.resetPose();
+        man1.setDepth(24);
+        if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
+            this.ui.worldContainer.sort('depth');
+        }
+        man1.animator?.playWalk({ speed: 1.1 });
+
+        this.scene.tweens.add({
+            targets: man1,
+            x: manTargetX,
+            duration: walkDuration,
+            ease: 'Linear',
+            onComplete: () => {
+                man1.animator?.playIdle();
+                try {
+                    Utils.addAudio(this.scene, 'voice_man_mumble', 1.0);
+                } catch (e) { }
+
+                // Display House choice cards promptly after Man 1 reaches destination
+                this.scene.time.delayedCall(250, () => {
+                    this.goToStep('step_choose_house');
+                });
+            }
+        });
+    }
+
     _spawnBuildingDoors(buildingX, buildingY, bcScale = 0.22) {
         if (this._doorTrackingListener) {
             this.scene.events.off('update', this._doorTrackingListener);
@@ -1221,9 +1372,11 @@ export default class StoryController {
         }
 
         // 2. Start Party Music and Party FX (spotlight rays, darkening overlay)
-        this._startPartyMusic();
-        this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
-        this.partyFX.start();
+        if (this.isPartyFXEnabled) {
+            this._startPartyMusic();
+            this.partyFX = new PartyFXController(this.scene, this.ui.worldContainer, PARTY_FX_CONFIG, this.groundY);
+            this.partyFX.start();
+        }
 
         // 3. Crowd runs in from the left and begins disco dancing
         const worldScale = this.ui.worldContainer?.scaleX || 1;
@@ -1238,15 +1391,17 @@ export default class StoryController {
         const count = activeCrowd.length;
 
         const danceStyles = ['sharp_jumps', 'wave_arms', 'throw_arms', 'step_raise', 'spins'];
-        const yLevels = [-26, -13, 0, 13, 26];
-        yLevels.sort(() => Math.random() - 0.5);
+        // Friends are placed higher along the game axis than hero (smaller Y, depths behind hero)
+        const yOffsets = [-12, -6, 0, 6, 10];
+        yOffsets.sort(() => Math.random() - 0.5);
 
         const placements = activeCrowd.map((p, idx) => {
             const stepX = count > 1 ? (maxX - minX) / (count - 1) : 0;
             const jitterX = (Math.random() - 0.5) * 20;
             const targetX = Math.round(minX + idx * stepX + jitterX);
-            const yOffset = (yLevels[idx] !== undefined ? yLevels[idx] : 0) + (Math.random() - 0.5) * 6;
-            const targetY = Math.round(this.groundY + yOffset);
+            const yOffset = (yOffsets[idx] !== undefined ? yOffsets[idx] : 0) + (Math.random() - 0.5) * 4;
+            const targetY = Math.round(this.friendGroundY + yOffset);
+            p._groundY = targetY;
             return {
                 puppet: p,
                 targetX,
@@ -1277,8 +1432,13 @@ export default class StoryController {
                 duration: 1200 + idx * 100,
                 ease: 'Power1.easeOut',
                 onComplete: () => {
-                    const style = danceStyles[idx % danceStyles.length];
-                    p.animator?.playDance({ style });
+                    if (this.isPartyFXEnabled) {
+                        const style = danceStyles[idx % danceStyles.length];
+                        p.animator?.playDance({ style });
+                    } else {
+                        p.resetPose();
+                        p.animator?.playIdle();
+                    }
                     arrivedCount++;
                 }
             });
@@ -1319,8 +1479,8 @@ export default class StoryController {
                     this.scene.tweens.add({
                         targets: hero,
                         x: crowdCenterX,
-                        y: this.groundY + 38,
-                        duration: 650,
+                        y: this.heroGroundY,
+                        duration: 550,
                         ease: 'Power1.easeInOut',
                         onComplete: () => {
                             // After reaching position within group, Hero faces right (toward upcoming visitor)
@@ -1328,52 +1488,12 @@ export default class StoryController {
                             hero.animator?.playIdle();
                             hero.setFace('happy');
 
-                            // 6. Sequence Man 1 (realtor) entrance from the right edge
-                            const man1 = this.puppets.man_1;
-                            if (man1) {
-                                const screenRightLocal = (this.scene.scale.width - containerX) / worldScale;
-                                const fromX = Math.max(Math.round(screenRightLocal + 120), 460);
-                                const manTargetX = 220;
-
-                                man1.setPosition(fromX, this.groundY);
-                                const manScale = this._getCharacterScale(man1, -1);
-                                man1.setScale(manScale.x, manScale.y);
-                                man1.setVisible(true);
-                                man1.resetPose();
-                                man1.setDepth(24);
-                                if (this.ui.worldContainer && typeof this.ui.worldContainer.sort === 'function') {
-                                    this.ui.worldContainer.sort('depth');
-                                }
-                                man1.animator?.playWalk({ speed: 0.55 });
-
-                                this.scene.tweens.add({
-                                    targets: man1,
-                                    x: manTargetX,
-                                    duration: 2000,
-                                    ease: 'Power1.easeOut',
-                                    onComplete: () => {
-                                        man1.animator?.playIdle();
-                                        try {
-                                            Utils.addAudio(this.scene, 'voice_man_mumble', 1.0);
-                                        } catch (e) { }
-
-                                        // Display House choice cards ONLY after Man 1 reaches destination
-                                        this.scene.time.delayedCall(400, () => {
-                                            this.goToStep('step_choose_house');
-                                        });
-                                    }
-                                });
-                            } else {
-                                this.scene.time.delayedCall(400, () => {
-                                    this.goToStep('step_choose_house');
-                                });
-                            }
+                            // Sequence Man 1 (realtor) entrance immediately from right edge
+                            this._sequenceMan1Entrance(220);
                         }
                     });
                 } else {
-                    this.scene.time.delayedCall(400, () => {
-                        this.goToStep('step_choose_house');
-                    });
+                    this._sequenceMan1Entrance(220);
                 }
             }
         );
@@ -1668,8 +1788,7 @@ export default class StoryController {
             const houseHeroTargetX = targetHouseX - halfCharWidth;
 
             const distance = Math.abs(targetHouseX - startX);
-            const walkSpeed = this.story?.walk_speed || 500;
-            const cameraDuration = Math.round((distance / walkSpeed) * 1000);
+            const cameraDuration = 1400; // Fast, responsive transition between locations
 
             if (hero) {
                 hero.setFace('happy');
@@ -1704,7 +1823,8 @@ export default class StoryController {
                 friends.forEach((p, idx) => {
                     p.setVisible(true);
                     p.resetPose();
-                    p.setPosition(houseHeroTargetX - 120 - (idx * 60), this.groundY);
+                    const fY = p._groundY || p.y || this.friendGroundY;
+                    p.setPosition(houseHeroTargetX - 120 - (idx * 60), fY);
                     p.animator?.playIdle();
                 });
                 this._runStepHouseArrival({ targetHouseX });
@@ -1753,10 +1873,11 @@ export default class StoryController {
 
         // 1. Hero starts walking forward towards the house
         if (hero) {
-            hero.animator?.playWalk();
+            hero.animator?.playWalk({ speed: 1.1 });
             const heroTween = this.scene.tweens.add({
                 targets: hero,
                 x: houseHeroTargetX,
+                y: this.heroGroundY,
                 duration: cameraDuration,
                 ease: 'Power1.easeInOut',
                 onComplete: () => {
@@ -1769,23 +1890,37 @@ export default class StoryController {
         }
 
         // 2. Friends: NO TELEPORTING - start strictly from their current resting positions where they finished dancing
-        // with sequential per-character stagger (50-150ms delay) so they do not snap or move in rigid synchrony
+        // with sequential per-character stagger so they do not snap or move in rigid synchrony
         friends.forEach((p, idx) => {
             const startFriendX = p.x;
             const targetFriendX = houseHeroTargetX - 120 - (idx * 60);
-            const staggerDelay = 60 + (idx * 90); // 60ms, 150ms, 240ms, 330ms, 420ms
-            const friendDuration = Math.max(1200, cameraDuration - staggerDelay);
+            const targetFriendY = p._groundY || p.y || this.friendGroundY;
+            const staggerDelay = 30 + (idx * 40); // 30ms, 70ms, 110ms, 150ms, 190ms
+            const friendDuration = Math.max(900, cameraDuration - staggerDelay);
+
+            // Cohesive, moderately cartoonish walk parameters with subtle individual variations
+            const cartoonStyle = {
+                duration: friendDuration,
+                speed: 1.12 + (idx % 3) * 0.03, // Harmonious group cadence (1.12, 1.15, 1.18)
+                phaseOffset: idx * 0.45,        // Subtle step phase offset so friends don't step in rigid lockstep
+                maxLegAngle: 29 + (idx % 2) * 1.5, // 29° - 30.5° (toned down, charming cartoon stride)
+                maxArmAngle: 24 + (idx % 2) * 1.5, // 24° - 25.5° (toned down, gentle arm swings)
+                maxBounce: 8.5 + (idx % 2) * 1.0,  // 8.5px - 9.5px (springy but grounded)
+                maxHeadAngle: 3.5,                 // 3.5° (subtle jaunty bobbing)
+                maxBodyAngle: 2.5                  // 2.5° (subtle playful sway)
+            };
 
             const friendTween = this.scene.tweens.add({
                 targets: p,
                 x: targetFriendX,
+                y: targetFriendY,
                 delay: staggerDelay,
                 duration: friendDuration,
                 ease: 'Power1.easeInOut',
                 onStart: () => {
                     const pScale = this._getCharacterScale(p, 1);
                     p.setScale(pScale.x, pScale.y);
-                    p.animator?.playWalk({ speed: 0.52 + (idx % 3) * 0.05 });
+                    p.animator?.playCartoonWalk(cartoonStyle);
                 },
                 onComplete: () => {
                     p.animator?.playIdle();
@@ -1828,25 +1963,21 @@ export default class StoryController {
         const hero = this.puppets.hero;
         const girl2 = this.puppets.girl_2;
 
-        if (hero) {
-            hero.setFace('amazed');
-        }
         if (this.puppets.man_1) {
             this.puppets.man_1.setVisible(false);
         }
 
         const isPortrait = this.scene.scale.width < this.scene.scale.height;
         const fullCharWidth = halfCharWidth * 2; // ~180px body width
-        // Stop further to the right by approximately one full body width compared to current resting position
         const girl2Spacing = (isPortrait ? 65 : 75) + fullCharWidth;
         const girl2TargetX = houseCenter + girl2Spacing;
 
-        let heroFinished = false;
+        let heroFinished = true;
         let girl2Finished = false;
 
         const checkDone = () => {
             if (heroFinished && girl2Finished) {
-                this.scene.time.delayedCall(350, () => {
+                this.scene.time.delayedCall(250, () => {
                     this.goToStep('step_choose_woman');
                 });
             }
@@ -1854,39 +1985,29 @@ export default class StoryController {
 
         const heroTargetX = houseCenter - halfCharWidth;
         if (hero) {
-            hero.animator?.playWalk();
-            this.scene.tweens.add({
-                targets: hero,
-                x: heroTargetX,
-                duration: 750,
-                ease: 'Power1.easeInOut',
-                onComplete: () => {
-                    hero.animator?.playIdle();
-                    heroFinished = true;
-                    checkDone();
-                }
-            });
-        } else {
-            heroFinished = true;
+            hero.setPosition(heroTargetX, this.heroGroundY);
+            hero.animator?.playIdle();
+            hero.setFace('amazed');
         }
 
         if (girl2) {
             girl2.setDepth(28); // Rendered behind Hero (depth 30)
-            girl2.setPosition(houseCenter + 800, this.girl2GroundY);
+            const girl2FromX = girl2TargetX + 220;
+            girl2.setPosition(girl2FromX, this.girl2GroundY);
             girl2.y = this.girl2GroundY;
             const girl2Scale = this._getCharacterScale(girl2, -1);
             girl2.setScale(girl2Scale.x, girl2Scale.y);
             girl2.setVisible(true);
-            girl2.animator?.playWalk({ speed: 0.5 });
+            girl2.animator?.playWalk({ speed: 0.85 });
             try {
                 Utils.addAudio(this.scene, 'voice_hero_gasp_aah', 1.0);
             } catch (e) { }
 
-            // Friends remain strictly in their current positions on screen (idle animation / subtle ambient breathing/sway) without retreating
+            // Friends remain strictly in their current positions on screen in idle
             const friends = [this.puppets.friend1, this.puppets.friend2, this.puppets.friend3, this.puppets.friend4, this.puppets.friend5].filter(c => !!c);
             friends.forEach(p => {
                 const pScale = this._getCharacterScale(p, 1);
-                p.setScale(pScale.x, pScale.y); // Face right toward Hero and girl_2
+                p.setScale(pScale.x, pScale.y);
                 p.animator?.playIdle();
             });
 
@@ -1894,7 +2015,7 @@ export default class StoryController {
                 targets: girl2,
                 x: girl2TargetX,
                 y: this.girl2GroundY,
-                duration: 1800,
+                duration: 1100,
                 ease: 'Power1.easeOut',
                 onComplete: () => {
                     girl2.y = this.girl2GroundY;
