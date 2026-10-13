@@ -9,10 +9,34 @@ export default class FinalWindow {
         this._onCta = onCta;
         this._lastCtaTime = 0;
 
+        this._buttons = [];
+        this._isShown = false;
+        this._handDismissed = false;
+        this._helperHand = null;
+        this._helperHandTimer = null;
+        this._helperHandSequenceTimer = null;
+
         this._buildOverlay();
         this._buildButton();
 
+        if (this._scene?.input) {
+            this._scene.input.on('pointerdown', this._onPointerDown, this);
+        }
+
         this.setVisible(false);
+    }
+
+    _onPointerDown() {
+        if (this._isShown) {
+            this._clearHelperHand();
+        }
+    }
+
+    setButtons(buttons) {
+        this._buttons = buttons || [];
+        if (this._isShown && !this._handDismissed) {
+            this._startHelperHandTimer();
+        }
     }
 
     _buildOverlay() {
@@ -71,7 +95,13 @@ export default class FinalWindow {
         this._btnInstall.setVisible(visible);
     }
 
-    show() {
+    show(buttons = null) {
+        if (buttons) {
+            this._buttons = buttons;
+        }
+        this._isShown = true;
+        this._handDismissed = false;
+
         if (typeof window.trackAxonEvent === 'function') {
             window.trackAxonEvent('CHALLENGE_SOLVED');
             window.trackAxonEvent('ENDCARD_SHOWN');
@@ -125,6 +155,171 @@ export default class FinalWindow {
                 this._startPulseAnimation();
             }
         });
+
+        // 1-second delay before helper hand prompts on buttons
+        this._startHelperHandTimer();
+    }
+
+    _startHelperHandTimer() {
+        if (this._handDismissed || !this._isShown) return;
+        if (this._helperHandTimer) {
+            this._helperHandTimer.remove();
+            this._helperHandTimer = null;
+        }
+
+        this._helperHandTimer = this._scene.time.delayedCall(1000, () => {
+            this._startHelperHand();
+        });
+    }
+
+    _startHelperHand() {
+        if (this._handDismissed || !this._isShown) return;
+        if (!this._scene || !this._scene.textures.exists('helper_hand')) return;
+
+        let targetButtons = (this._buttons && this._buttons.length > 0)
+            ? this._buttons
+            : (this._scene.storyController?.finaleButtons?.length > 0
+                ? this._scene.storyController.finaleButtons
+                : (this._btnInstall && (this._pScale > 0 || this._lScale > 0) ? [this._btnInstall] : []));
+
+        targetButtons = targetButtons.filter(b => b && b.active && b.visible !== false);
+        if (targetButtons.length === 0) return;
+
+        if (this._helperHandSequenceTimer) {
+            this._helperHandSequenceTimer.remove();
+            this._helperHandSequenceTimer = null;
+        }
+        if (this._helperHand) {
+            this._scene.tweens.killTweensOf(this._helperHand);
+        }
+
+        if (!this._helperHand || !this._helperHand.active) {
+            this._helperHand = this._scene.add.image(0, 0, 'helper_hand');
+            this._helperHand.setOrigin(0.12, 0.05);
+            const handScale = 0.44;
+            this._helperHand.handBaseScale = handScale;
+            this._helperHand.setScale(handScale);
+            this._helperHand.setDepth(200);
+            this._container.add(this._helperHand);
+
+            const firstBtn = targetButtons[0];
+            this._helperHand.setPosition(firstBtn.x + 35, firstBtn.y + 60);
+            this._helperHand.setAlpha(0);
+        }
+
+        this._runHelperHandLoop(targetButtons, 0);
+    }
+
+    _runHelperHandLoop(targetButtons, index = 0) {
+        if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
+        if (!targetButtons || targetButtons.length === 0) return;
+
+        const btn = targetButtons[index % targetButtons.length];
+        if (!btn || !btn.active) return;
+
+        const targetX = btn.x + 15;
+        const targetY = btn.y + 15;
+        const baseScale = this._helperHand.handBaseScale || 0.44;
+
+        // 1. Move hand to button
+        this._scene.tweens.add({
+            targets: this._helperHand,
+            x: targetX,
+            y: targetY,
+            alpha: 1,
+            duration: 380,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+                if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
+
+                // 2. Simulate click: press hand down and button down
+                this._scene.tweens.add({
+                    targets: this._helperHand,
+                    scaleX: baseScale * 0.86,
+                    scaleY: baseScale * 0.86,
+                    y: targetY + 10,
+                    duration: 130,
+                    ease: 'Quad.easeInOut'
+                });
+
+                if (btn.buttonImage) {
+                    this._scene.tweens.add({
+                        targets: btn.buttonImage,
+                        scaleX: 0.92,
+                        scaleY: 0.92,
+                        duration: 130,
+                        ease: 'Quad.easeInOut'
+                    });
+                }
+
+                this._scene.time.delayedCall(130, () => {
+                    if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
+
+                    // Release simulated click
+                    this._scene.tweens.add({
+                        targets: this._helperHand,
+                        scaleX: baseScale,
+                        scaleY: baseScale,
+                        y: targetY,
+                        duration: 150,
+                        ease: 'Quad.easeInOut'
+                    });
+
+                    if (btn.buttonImage) {
+                        this._scene.tweens.add({
+                            targets: btn.buttonImage,
+                            scaleX: 1.0,
+                            scaleY: 1.0,
+                            duration: 150,
+                            ease: 'Quad.easeInOut'
+                        });
+                    }
+
+                    this._scene.time.delayedCall(150, () => {
+                        if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
+
+                        // Pause before moving to next target button
+                        this._helperHandSequenceTimer = this._scene.time.delayedCall(450, () => {
+                            if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
+
+                            let currentTargets = (this._buttons && this._buttons.length > 0)
+                                ? this._buttons
+                                : (this._scene.storyController?.finaleButtons || targetButtons);
+                            currentTargets = currentTargets.filter(b => b && b.active && b.visible !== false);
+                            if (currentTargets.length === 0) currentTargets = targetButtons;
+
+                            this._runHelperHandLoop(currentTargets, index + 1);
+                        });
+                    });
+                });
+            }
+        });
+    }
+
+    _clearHelperHand() {
+        this._handDismissed = true;
+        if (this._helperHandTimer) {
+            this._helperHandTimer.remove();
+            this._helperHandTimer = null;
+        }
+        if (this._helperHandSequenceTimer) {
+            this._helperHandSequenceTimer.remove();
+            this._helperHandSequenceTimer = null;
+        }
+        if (this._helperHand) {
+            this._scene.tweens.killTweensOf(this._helperHand);
+            this._helperHand.destroy();
+            this._helperHand = null;
+        }
+        const buttons = (this._buttons && this._buttons.length > 0)
+            ? this._buttons
+            : (this._scene.storyController?.finaleButtons || []);
+        buttons.forEach(btn => {
+            if (btn && btn.buttonImage) {
+                this._scene.tweens.killTweensOf(btn.buttonImage);
+                btn.buttonImage.setScale(1.0);
+            }
+        });
     }
 
     _startPulseAnimation() {
@@ -142,6 +337,7 @@ export default class FinalWindow {
     }
 
     _handleCtaClick() {
+        this._clearHelperHand();
         const now = performance.now();
         if (now - this._lastCtaTime < 500) return;
         this._lastCtaTime = now;

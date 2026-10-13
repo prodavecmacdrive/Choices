@@ -204,7 +204,7 @@ export default class Game extends ParentScene {
 
         // 4. Fixed screen UI components
         const balPos = UI_CONFIG?.balance?.position || { x: 450, y: 120 };
-        const startBalance = this.SETTINGS?.economy?.start_balance ?? STORY_CONFIG.start_balance ?? 500000;
+        const startBalance = this.SETTINGS?.initialBalance ?? this.SETTINGS?.economy?.initialBalance ?? this.SETTINGS?.economy?.start_balance ?? STORY_CONFIG.initialBalance ?? STORY_CONFIG.start_balance ?? 500000;
         this.balanceView = new BalanceView(this, balPos.x, balPos.y, startBalance);
         this.balanceView.ignoreResize = true;
         this.mainContainer.add(this.balanceView);

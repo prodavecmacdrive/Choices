@@ -14,8 +14,8 @@ module.exports = {
     'compressAtlas': true,
     'compressTexture': true,
     'compressAudio': true,
-    'ios': 'https://apps.apple.com/ua/app/merge-sticker-playbook-2d/id6505066374',
-    'android': 'https://play.google.com/store/apps/details?id=com.game.goolny.stickers&hl=en',
+    'ios': 'https://apps.apple.com/ua/app/cash-inc-fame-fortune-game/id1270598321',
+    'android': 'https://play.google.com/store/apps/details?id=com.alegrium.cong2',
 
     // Dev mode previews scene-1 only; override to test other flows.
     'currentVersion': 'full',

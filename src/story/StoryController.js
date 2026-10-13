@@ -855,13 +855,7 @@ export default class StoryController {
                                                 }
                                             });
 
-                                            // 4. Coin farming sequence
-                                            const revenue = this.story?.steps?.step_lemonade_stand?.revenue ?? 750000;
-                                            if (this.ui.balance) {
-                                                this.scene.time.delayedCall(500, () => {
-                                                    this.ui.balance.spawnCoinFlyIn(300 + standX, 445, revenue, 10);
-                                                });
-                                            }
+                                            // 4. Stand sequence - no money earned (pure deduction economy)
 
                                             // 5. Crowd runs in - distribute widely along X up to screen edge, spread Y, and sort Z-index
                                             const worldScale = this.ui.worldContainer?.scaleX || 1;
@@ -2575,6 +2569,10 @@ export default class StoryController {
 
         this.finaleButtons = [this.btnTryAgain, this.btnRestart];
 
+        if (this.ui.finalWindow && typeof this.ui.finalWindow.setButtons === 'function') {
+            this.ui.finalWindow.setButtons(this.finaleButtons);
+        }
+
         // Ensure main camera ignores finale buttons and uiCamera renders them
         if (this.scene.cameras?.main && this.scene.finaleContainer) {
             this.scene.cameras.main.ignore(this.scene.finaleContainer);
@@ -2738,6 +2736,9 @@ export default class StoryController {
     }
 
     _onCta() {
+        if (this.ui.finalWindow && typeof this.ui.finalWindow._clearHelperHand === 'function') {
+            this.ui.finalWindow._clearHelperHand();
+        }
         if (window.App && window.App.network) {
             window.App.network.ctaClick();
         }

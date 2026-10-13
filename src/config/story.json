@@ -1,5 +1,6 @@
 {
     "enablePartyFX": false,
+    "initialBalance": 500000,
     "start_balance": 500000,
     "start_step": "step_intro",
     "walk_speed": 500,
@@ -105,14 +106,14 @@
                     "id": "choice_lemonade_stand",
                     "icon": "lemonade_stand_ico",
                     "title": "LEMONADE_STAND",
-                    "price": 400000,
+                    "price": 50000,
                     "next": "step_lemonade_stand"
                 },
                 {
                     "id": "choice_good_business",
                     "icon": "prestige_ico",
                     "title": "CHOICE_GOOD_BUSINESS",
-                    "price": 350000,
+                    "price": 50000,
                     "next": "step_good_business"
                 }
             ]
@@ -120,14 +121,14 @@
         "step_lemonade_stand": {
             "location": "jewel_building_bg",
             "branch": "lemonade_stand",
-            "price": 400000,
-            "revenue": 750000,
+            "price": 50000,
+            "revenue": 0,
             "next": "step_choose_house"
         },
         "step_good_business": {
             "location": "jewel_building_bg",
             "branch": "good_business",
-            "price": 350000,
+            "price": 50000,
             "next": "step_choose_house"
         },
         "step_walk_to_jewel": {
@@ -163,14 +164,14 @@
                     "id": "choice_luxury",
                     "icon": "luxury_house_ico",
                     "title": "CHOICE_LUXURY_HOUSE",
-                    "price": 750000,
+                    "price": 320000,
                     "next": "step_mansion_arrival"
                 },
                 {
                     "id": "choice_simple",
                     "icon": "simple_house_ico",
                     "title": "CHOICE_SIMPLE_HOUSE",
-                    "price": 50000,
+                    "price": 200000,
                     "next": "step_shack_arrival"
                 }
             ]
@@ -217,14 +218,14 @@
                     "id": "choice_bad_ring",
                     "icon": "ring_bad_ico",
                     "title": "CHOICE_BAD_RING",
-                    "price": 0,
+                    "price": 30000,
                     "next": "step_fail_end"
                 },
                 {
                     "id": "choice_luxury_ring",
                     "icon": "ring_luxury_ico",
                     "title": "CHOICE_LUXURY_RING",
-                    "price": 100000,
+                    "price": 150000,
                     "next": "step_fail_end"
                 }
             ]
@@ -260,7 +261,7 @@
                     "id": "choice_girl_1",
                     "icon": "girl1_ico",
                     "title": "CHOICE_GIRL1",
-                    "price": 0,
+                    "price": 100000,
                     "next": "step_fail_end_woman"
                 }
             ]
