@@ -15,6 +15,7 @@ export default class BalanceView extends Phaser.GameObjects.Container {
 
         this.ignoreResize = true;
         this.baseX = posX;
+        this.baseY = posY;
         const isPortrait = scene.scale ? (scene.scale.width < scene.scale.height) : true;
         this.uiScale = this.getScaleSetting(isPortrait);
         this.setPosition(posX, posY);
@@ -126,12 +127,21 @@ export default class BalanceView extends Phaser.GameObjects.Container {
         const adaptedY = topEdge + (baseMarginTop * uiScale);
 
         this.baseX = adaptedX;
+        this.baseY = adaptedY;
         this.setPosition(adaptedX, adaptedY);
     }
 
+    restoreRestingPosition() {
+        if (this.baseX !== undefined && this.baseY !== undefined) {
+            this.setPosition(this.baseX, this.baseY);
+            this.setScale(this.uiScale || 1.0);
+        }
+    }
+
     formatCash(val) {
-        const num = Math.max(0, Math.round(val));
-        return '' + num.toLocaleString('en-US').replace(/,/g, ' ');
+        const num = Math.round(val);
+        const sign = num < 0 ? '-' : '';
+        return sign + Math.abs(num).toLocaleString('en-US').replace(/,/g, ' ');
     }
 
     getValue() {
@@ -151,9 +161,9 @@ export default class BalanceView extends Phaser.GameObjects.Container {
         }
     }
 
-    subtract(amount, duration = 650) {
+    subtract(amount, duration = 650, skipBounce = false) {
         const startVal = this.currentBalance;
-        const targetVal = Math.max(0, startVal - amount);
+        const targetVal = startVal - amount;
         this.currentBalance = targetVal;
 
         try {
@@ -164,21 +174,23 @@ export default class BalanceView extends Phaser.GameObjects.Container {
             this.currentTween.stop();
         }
 
-        // Plate bounce animation
-        this.scene.tweens.killTweensOf(this);
-        const baseScale = this.uiScale || 1;
-        this.setScale(baseScale);
-        this.scene.tweens.add({
-            targets: this,
-            scaleX: baseScale * 1.08,
-            scaleY: baseScale * 1.08,
-            duration: 120,
-            yoyo: true,
-            ease: 'Sine.easeOut',
-            onComplete: () => {
-                this.setScale(baseScale);
-            }
-        });
+        if (!skipBounce) {
+            // Plate bounce animation
+            this.scene.tweens.killTweensOf(this);
+            const baseScale = this.uiScale || 1;
+            this.setScale(baseScale);
+            this.scene.tweens.add({
+                targets: this,
+                scaleX: baseScale * 1.08,
+                scaleY: baseScale * 1.08,
+                duration: 120,
+                yoyo: true,
+                ease: 'Sine.easeOut',
+                onComplete: () => {
+                    this.setScale(baseScale);
+                }
+            });
+        }
 
         // Visible falling coin particles on spend
         this._spawnCoinDrop();
@@ -261,7 +273,7 @@ export default class BalanceView extends Phaser.GameObjects.Container {
     }
 
     setBalance(value) {
-        this.currentBalance = Math.max(0, Math.round(value));
+        this.currentBalance = Math.round(value);
         if (this.balanceText) {
             this.balanceText.setText(this.formatCash(this.currentBalance));
         }

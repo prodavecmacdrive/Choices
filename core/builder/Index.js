@@ -156,8 +156,11 @@ class BuilderPlugin {
 
         // AppLovin Axon analytics helper — stateful implementation for Applovin builds,
         // silent no-op stub for every other network so game code never throws ReferenceError.
-        const axonHelper = network === 'Applovin'
+        // AppLovin Axon analytics helper — stateful implementation for Applovin builds and dev mode,
+        // silent no-op stub for other networks so game code never throws ReferenceError.
+        const axonHelper = (network === 'Applovin' || this.mode === 'development')
             ? '(function(){' +
+                  'var _sent={};' +
                   'var _hasStarted=false;' +
                   'var _hasOutcome=false;' +
                   'function _send(evt){' +
@@ -169,42 +172,51 @@ class BuilderPlugin {
                       '}' +
                   '}' +
                   'var fn=function(eventName){' +
+                      'if(!eventName)return;' +
                       'if(eventName===\'CHALLENGE_STARTED\'){' +
                           'if(_hasStarted)return;' +
                           '_hasStarted=true;' +
+                          '_sent[eventName]=true;' +
                           '_send(\'CHALLENGE_STARTED\');' +
                           'return;' +
                       '}' +
-                      'if(eventName===\'CHALLENGE_SOLVED\'||eventName===\'CHALLENGE_FAILED\'||eventName===\'CHALLENGE_COMPLETED\'){' +
-                          'if(_hasOutcome)return;' +
+                      'if(eventName===\'CHALLENGE_PASS_25\'||eventName===\'CHALLENGE_PASS_50\'||eventName===\'CHALLENGE_PASS_75\'){' +
                           'if(!_hasStarted){' +
                               '_hasStarted=true;' +
+                              '_sent[\'CHALLENGE_STARTED\']=true;' +
                               '_send(\'CHALLENGE_STARTED\');' +
                           '}' +
-                          '_hasOutcome=true;' +
+                          'if(_sent[eventName])return;' +
+                          '_sent[eventName]=true;' +
                           '_send(eventName);' +
                           'return;' +
                       '}' +
-                      'if(eventName===\'CTA_CLICKED\'||eventName===\'ENDCARD_SHOWN\'){' +
-                          'if(_hasStarted&&!_hasOutcome){' +
-                              '_hasOutcome=true;' +
-                              '_send(\'CHALLENGE_COMPLETED\');' +
+                      'if(eventName===\'CHALLENGE_SOLVED\'||eventName===\'CHALLENGE_FAILED\'){' +
+                          'if(_hasOutcome)return;' +
+                          'if(!_hasStarted){' +
+                              '_hasStarted=true;' +
+                              '_sent[\'CHALLENGE_STARTED\']=true;' +
+                              '_send(\'CHALLENGE_STARTED\');' +
                           '}' +
+                          '_hasOutcome=true;' +
+                          '_sent[eventName]=true;' +
+                          '_send(eventName);' +
+                          'return;' +
+                      '}' +
+                      'if(eventName===\'CHALLENGE_RETRY\'){' +
+                          'if(!_sent[\'CHALLENGE_FAILED\'])return;' +
+                          '_hasOutcome=false;' +
+                          '_send(\'CHALLENGE_RETRY\');' +
+                          'return;' +
+                      '}' +
+                      'if(eventName===\'LOADING\'||eventName===\'LOADED\'||eventName===\'DISPLAYED\'||eventName===\'ENDCARD_SHOWN\'||eventName===\'CTA_CLICKED\'){' +
+                          'if(_sent[eventName])return;' +
+                          '_sent[eventName]=true;' +
                           '_send(eventName);' +
                           'return;' +
                       '}' +
                       '_send(eventName);' +
                   '};' +
-                  'fn._ensureOutcome=function(){' +
-                      'if(_hasStarted&&!_hasOutcome){' +
-                          '_hasOutcome=true;' +
-                          '_send(\'CHALLENGE_COMPLETED\');' +
-                      '}' +
-                  '};' +
-                  'if(typeof window!==\'undefined\'){' +
-                      'window.addEventListener(\'pagehide\',fn._ensureOutcome);' +
-                      'window.addEventListener(\'beforeunload\',fn._ensureOutcome);' +
-                  '}' +
                   'window.trackAxonEvent=fn;' +
               '})();'
             : 'window.trackAxonEvent=function(){};';

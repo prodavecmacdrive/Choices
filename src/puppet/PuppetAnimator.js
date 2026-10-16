@@ -74,6 +74,70 @@ export default class PuppetAnimator {
         }
     }
 
+    playUpsetWaving(options = {}) {
+        this.stopAll();
+        this.isWalking = false;
+
+        const armL = this.puppet.bones?.arm_left;
+        const armR = this.puppet.bones?.arm_right;
+        const body = this.puppet.bones?.body;
+        const head = this.puppet.bones?.head;
+
+        if (armL) {
+            this.scene.tweens.killTweensOf(armL);
+            armL.angle = 145;
+            const waveL = this.scene.tweens.add({
+                targets: armL,
+                angle: 175,
+                duration: 100,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            this.activeTweens.push(waveL);
+        }
+
+        if (armR) {
+            this.scene.tweens.killTweensOf(armR);
+            armR.angle = -145;
+            const waveR = this.scene.tweens.add({
+                targets: armR,
+                angle: -175,
+                duration: 100,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            this.activeTweens.push(waveR);
+        }
+
+        if (body && body.initial) {
+            this.scene.tweens.killTweensOf(body);
+            const bodyShudder = this.scene.tweens.add({
+                targets: body,
+                y: body.initial.y - 4,
+                duration: 85,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Quad.easeInOut'
+            });
+            this.activeTweens.push(bodyShudder);
+        }
+
+        if (head) {
+            this.scene.tweens.killTweensOf(head);
+            const headShudder = this.scene.tweens.add({
+                targets: head,
+                angle: 5,
+                duration: 95,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            this.activeTweens.push(headShudder);
+        }
+    }
+
     playWalk(options = {}) {
         this.stopAll();
         this.isWalking = true;

@@ -5,11 +5,20 @@
     "start_balance": 500000,
     "lemonade_stand_cost": 50000,
     "good_job_cost": 50000,
-    "default_house_cost": 200000,
+    "default_house_cost": 290000,
     "luxury_house_cost": 320000,
     "date_cost": 100000,
-    "luxury_ring_cost": 150000,
-    "grandma_ring_cost": 30000
+    "total_mess_cost": 50000,
+    "hot_model_cost": 100000,
+    "luxury_ring_cost": 200000,
+    "grandma_ring_cost": 110000
+  },
+  "business_center_entrance": {
+    "scale": 1.46,
+    "x": 17,
+    "y": 241,
+    "carpet_top_half_width": 30,
+    "carpet_bottom_half_width": 65
   },
   "button": {
     "texture": "ui_button",

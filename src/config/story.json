@@ -7,6 +7,13 @@
     "ground_y": 355,
     "ground_texture_y": 227.2,
     "lemonade_stand_y": 355,
+    "business_center_entrance": {
+        "scale": 1.46,
+        "x": 17,
+        "y": 241,
+        "carpet_top_half_width": 30,
+        "carpet_bottom_half_width": 65
+    },
     "hero_y_offset": 26,
     "camera_approach": {
         "y_offset": 180,
@@ -171,7 +178,7 @@
                     "id": "choice_simple",
                     "icon": "simple_house_ico",
                     "title": "CHOICE_SIMPLE_HOUSE",
-                    "price": 200000,
+                    "price": 290000,
                     "next": "step_shack_arrival"
                 }
             ]
@@ -184,6 +191,12 @@
                     "skin": "hero_rags",
                     "position": "center",
                     "face": "happy"
+                },
+                {
+                    "id": "girl_1",
+                    "skin": "girl_rags",
+                    "position": "left",
+                    "face": "idle"
                 },
                 {
                     "id": "girl_2",
@@ -204,6 +217,12 @@
                     "face": "happy"
                 },
                 {
+                    "id": "girl_1",
+                    "skin": "girl_rags",
+                    "position": "left",
+                    "face": "idle"
+                },
+                {
                     "id": "girl_2",
                     "skin": "girl2_dress",
                     "position": "right",
@@ -218,14 +237,14 @@
                     "id": "choice_bad_ring",
                     "icon": "ring_bad_ico",
                     "title": "CHOICE_BAD_RING",
-                    "price": 30000,
+                    "price": 110000,
                     "next": "step_fail_end"
                 },
                 {
                     "id": "choice_luxury_ring",
                     "icon": "ring_luxury_ico",
                     "title": "CHOICE_LUXURY_RING",
-                    "price": 150000,
+                    "price": 200000,
                     "next": "step_fail_end"
                 }
             ]
@@ -261,7 +280,7 @@
                     "id": "choice_girl_1",
                     "icon": "girl1_ico",
                     "title": "CHOICE_GIRL1",
-                    "price": 100000,
+                    "price": 50000,
                     "next": "step_fail_end_woman"
                 }
             ]

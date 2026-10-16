@@ -1,5 +1,5 @@
 module.exports = {
-    'name': 'MyAd',
+    'name': 'INC_mip_grknopa_choices_Embellished_UGC_Gen_EN',
     // 'networks': ['Applovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'TikTok', 'UnityAds', 'Vungle'],
     'networks': ['Applovin', 'Facebook', 'Google', 'Mintegral', 'Moloco', 'UnityAds'],
     'mirrors': {

@@ -36,6 +36,15 @@ export default class Game extends ParentScene {
     create() {
         this.cameras.main.setBackgroundColor('#1a1a24');
 
+        // Track CHALLENGE_STARTED on initial user interaction with the playable
+        if (this.input) {
+            this.input.once('pointerdown', () => {
+                if (typeof window.trackAxonEvent === 'function') {
+                    window.trackAxonEvent('CHALLENGE_STARTED');
+                }
+            });
+        }
+
         // 1. World container holding panoramic backgrounds and characters
         this.worldContainer = this.add.container(300, 450);
         this.worldContainer.ignoreResize = true;
@@ -203,7 +212,10 @@ export default class Game extends ParentScene {
         };
 
         // 4. Fixed screen UI components
-        const balPos = UI_CONFIG?.balance?.position || { x: 450, y: 120 };
+        const balPosCfg = UI_CONFIG?.balance?.position || {};
+        const balPos = isPortrait
+            ? (balPosCfg.portrait || { x: balPosCfg.x || 440, y: balPosCfg.y || 120 })
+            : (balPosCfg.landscape || { x: balPosCfg.x || 460, y: balPosCfg.y || 80 });
         const startBalance = this.SETTINGS?.initialBalance ?? this.SETTINGS?.economy?.initialBalance ?? this.SETTINGS?.economy?.start_balance ?? STORY_CONFIG.initialBalance ?? STORY_CONFIG.start_balance ?? 500000;
         this.balanceView = new BalanceView(this, balPos.x, balPos.y, startBalance);
         this.balanceView.ignoreResize = true;

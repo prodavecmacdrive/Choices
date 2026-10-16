@@ -95,15 +95,18 @@ export default class FinalWindow {
         this._btnInstall.setVisible(visible);
     }
 
-    show(buttons = null) {
-        if (buttons) {
+    show(buttons = null, options = {}) {
+        if (Array.isArray(buttons)) {
             this._buttons = buttons;
+        } else if (buttons && typeof buttons === 'object') {
+            options = Object.assign({}, buttons, options);
         }
         this._isShown = true;
         this._handDismissed = false;
 
+        const isSuccess = !!options.isSuccess;
         if (typeof window.trackAxonEvent === 'function') {
-            window.trackAxonEvent('CHALLENGE_SOLVED');
+            window.trackAxonEvent(isSuccess ? 'CHALLENGE_SOLVED' : 'CHALLENGE_FAILED');
             window.trackAxonEvent('ENDCARD_SHOWN');
         }
 

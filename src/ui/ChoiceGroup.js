@@ -53,6 +53,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
         this._customPosY = (typeof options.y === 'number') ? options.y : null;
         this._clearHelperHand();
         this._onlyAffordable = false;
+        this.allowNegativeBalance = !!options.allowNegativeBalance || !!options.allowNegative;
 
         if (options.balanceView) {
             this.balanceView = options.balanceView;
@@ -211,7 +212,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
                 const itemCost = Number(choice.price || 0);
 
                 // Insufficient funds handling: no interactive locks, repeatable on every click
-                if (itemCost > 0 && currentBalance < itemCost) {
+                if (!this.allowNegativeBalance && itemCost > 0 && currentBalance < itemCost) {
                     card.setScale(card.cardBaseScale || 1);
 
                     try {
@@ -455,7 +456,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
         const currentBalance = balanceView ? balanceView.getValue() : Infinity;
 
         let targetCards = [];
-        if (this._onlyAffordable) {
+        if (this._onlyAffordable && !this.allowNegativeBalance) {
             targetCards = this.cards.filter(c => {
                 const cost = Number(c.choiceData?.price || 0);
                 return cost <= currentBalance;
@@ -552,7 +553,7 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
                                     if (this.isSelecting || !this.helperHand || !this.helperHand.active) return;
 
                                     let currentTargets = targetCards;
-                                    if (this._onlyAffordable) {
+                                    if (this._onlyAffordable && !this.allowNegativeBalance) {
                                         const balanceView = this.getBalanceView();
                                         const curBal = balanceView ? balanceView.getValue() : Infinity;
                                         currentTargets = this.cards.filter(c => {

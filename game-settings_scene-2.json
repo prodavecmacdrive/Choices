@@ -8,8 +8,10 @@
     "default_house_cost": 200000,
     "luxury_house_cost": 320000,
     "date_cost": 100000,
-    "luxury_ring_cost": 150000,
-    "grandma_ring_cost": 30000
+    "total_mess_cost": 50000,
+    "hot_model_cost": 100000,
+    "luxury_ring_cost": 200000,
+    "grandma_ring_cost": 110000
   },
   "button": {
     "texture": "ui_button",
