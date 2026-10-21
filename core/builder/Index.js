@@ -8,6 +8,7 @@ const fonts = require('./Fonts.js');
 const audio = require('./Audio.js');
 const spine = require('./Spine.js');
 const imagemaps = require('./Imagemaps.js');
+const video = require('./Video.js');
 
 let config = require('../../config');
 
@@ -53,6 +54,7 @@ class BuilderPlugin {
             !fs.existsSync('assets/audio') ? fs.mkdir('assets/audio', () => audio.load.bind(this)()) : audio.load.bind(this)();
             !fs.existsSync('assets/spine') ? fs.mkdir('assets/spine', () => spine.load.bind(this)()) : spine.load.bind(this)();
             !fs.existsSync('assets/imagemap') ? fs.mkdir('assets/imagemap', () => imagemaps.load.bind(this)()) : imagemaps.load.bind(this)();
+            !fs.existsSync('assets/video') ? fs.mkdir('assets/video', () => video.load.bind(this)()) : video.load.bind(this)();
         });
     }
 
@@ -64,6 +66,7 @@ class BuilderPlugin {
         this.audioLoaded = false;
         this.spineLoaded = false;
         this.imagemapsLoaded = false;
+        this.videoLoaded = false;
         this.inlineSpine = false;
 
         this.currentNetworkCount = 0;
@@ -75,7 +78,7 @@ class BuilderPlugin {
         this.resources += `window.App.isDev=${this.mode === 'development'};`;
         this.resources += `window.App.iosUrl='${config.ios}';window.App.androidUrl='${config.android}';`;
         this.resources += 'window.App.resources={};window.App.resources.textures={};window.App.resources.sheets={};';
-        this.resources += 'window.App.resources.audio={};window.App.resources.spine={};window.App.resources.imagemaps={};';
+        this.resources += 'window.App.resources.audio={};window.App.resources.spine={};window.App.resources.imagemaps={};window.App.resources.video={};';
     }
 
     isCurrentVersionAsset(name, folder) {
@@ -124,7 +127,7 @@ class BuilderPlugin {
     // ─────────────────────────────────────────────────────────────────────────
 
     loadChunck() {
-        if(!this.audioLoaded || !this.fontsLoaded || !this.sheetsLoaded || !this.texturesLoaded || !this.spineLoaded || !this.imagemapsLoaded || this.buildComplete) return;
+        if(!this.audioLoaded || !this.fontsLoaded || !this.sheetsLoaded || !this.texturesLoaded || !this.spineLoaded || !this.imagemapsLoaded || !this.videoLoaded || this.buildComplete) return;
         
         this.buildComplete = true;
 

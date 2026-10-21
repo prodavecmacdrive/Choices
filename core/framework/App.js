@@ -48,13 +48,16 @@ class App extends Phaser.Game {
             });
         }
 
+        const initialWidth = Math.max(1, Math.floor((window.innerWidth || 320) * (window.devicePixelRatio || 1)));
+        const initialHeight = Math.max(1, Math.floor((window.innerHeight || 480) * (window.devicePixelRatio || 1)));
+
         const config = {
             type: Phaser.AUTO,
             parent: 'app',
             scale: {
                 mode: Phaser.Scale.NONE,
-                width: window.innerWidth * window.devicePixelRatio,
-                height: window.innerHeight * window.devicePixelRatio,
+                width: initialWidth,
+                height: initialHeight,
             },
             title: 'Core Version: ' + window.App.CORE_VERSION,
             backgroundColor: '#1e1e1e',
@@ -131,6 +134,35 @@ class App extends Phaser.Game {
         }
 
         super(config);
+
+        if (this.renderer) {
+            const proto = Object.getPrototypeOf(this.renderer);
+            if (proto) {
+                if (typeof proto.createFramebuffer === 'function' && !proto.createFramebuffer._isPatched) {
+                    const origCreateFbo = proto.createFramebuffer;
+                    proto.createFramebuffer = function(width, height, renderTexture, isFloat) {
+                        const safeW = Math.max(1, Math.floor(width || 1));
+                        const safeH = Math.max(1, Math.floor(height || 1));
+                        try {
+                            return origCreateFbo.call(this, safeW, safeH, renderTexture, isFloat);
+                        } catch (err) {
+                            console.warn('[App] Warning creating WebGL framebuffer:', err);
+                            return this.gl ? this.gl.createFramebuffer() : null;
+                        }
+                    };
+                    proto.createFramebuffer._isPatched = true;
+                }
+                if (typeof proto.createTextureFromSource === 'function' && !proto.createTextureFromSource._isPatched) {
+                    const origCreateTex = proto.createTextureFromSource;
+                    proto.createTextureFromSource = function(source, width, height, scaleMode) {
+                        const safeW = Math.max(1, Math.floor(width || (source && source.width) || 1));
+                        const safeH = Math.max(1, Math.floor(height || (source && source.height) || 1));
+                        return origCreateTex.call(this, source, safeW, safeH, scaleMode);
+                    };
+                    proto.createTextureFromSource._isPatched = true;
+                }
+            }
+        }
 
         this.create();
         this.addStyle();
@@ -212,31 +244,57 @@ class App extends Phaser.Game {
         let width = window.innerWidth;
         let height = window.innerHeight;
 
-        let deviceWidth = width * window.devicePixelRatio;
-        let deviceHeight = height * window.devicePixelRatio;
-        if(window.dapi) {
-            width = window.dapi.getScreenSize().width;
-            height = window.dapi.getScreenSize().height;
+        let dpr = window.devicePixelRatio || 1;
+        let deviceWidth = width * dpr;
+        let deviceHeight = height * dpr;
 
-            deviceWidth = window.dapi.getScreenSize().width * window.devicePixelRatio;
-            deviceHeight = window.dapi.getScreenSize().height * window.devicePixelRatio;
-        } else if (getConfiguredNetworkName() === 'Applovin') {
-            width = window.mraid.getScreenSize().width;
-            height = window.mraid.getScreenSize().height;
-
-            deviceWidth = window.mraid.getScreenSize().width * window.devicePixelRatio;
-            deviceHeight = window.mraid.getScreenSize().height * window.devicePixelRatio;
+        if (window.dapi && typeof window.dapi.getScreenSize === 'function') {
+            const size = window.dapi.getScreenSize();
+            if (size && size.width > 0 && size.height > 0) {
+                width = size.width;
+                height = size.height;
+                deviceWidth = width * dpr;
+                deviceHeight = height * dpr;
+            }
+        } else if (getConfiguredNetworkName() === 'Applovin' && window.mraid && typeof window.mraid.getScreenSize === 'function') {
+            const size = window.mraid.getScreenSize();
+            if (size && size.width > 0 && size.height > 0) {
+                width = size.width;
+                height = size.height;
+                deviceWidth = width * dpr;
+                deviceHeight = height * dpr;
+            }
         }
-        
-        document.getElementById('app').style.width = width + 'px';
-        document.getElementById('app').style.height = height + 'px';
 
-        this.canvas.style.width = width + 'px';
-        this.canvas.style.height = height + 'px';
+        // Avoid resizing WebGL pipeline to zero or invalid dimensions (prevents Framebuffer Incomplete Attachment error)
+        if (!width || !height || width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) {
+            return;
+        }
 
-        this.scale.resize(deviceWidth, deviceHeight);
+        width = Math.floor(width);
+        height = Math.floor(height);
+        deviceWidth = Math.max(1, Math.floor(deviceWidth || (width * dpr)));
+        deviceHeight = Math.max(1, Math.floor(deviceHeight || (height * dpr)));
+
+        const appEl = document.getElementById('app');
+        if (appEl) {
+            appEl.style.width = width + 'px';
+            appEl.style.height = height + 'px';
+        }
+
+        if (this.canvas) {
+            this.canvas.style.width = width + 'px';
+            this.canvas.style.height = height + 'px';
+        }
+
+        if (this.scale) {
+            this.scale.resize(deviceWidth, deviceHeight);
+        }
 
         let scale = Math.min(deviceWidth / 600, deviceHeight / 900);
+        if (!scale || !Number.isFinite(scale) || scale <= 0) {
+            scale = 1;
+        }
         this.size.scale = scale;
         this.size.isPortrait = deviceWidth < deviceHeight;
         

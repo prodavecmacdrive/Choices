@@ -1,6 +1,7 @@
 import ParentScene from "../core/framework/components/Scene";
 import Utils from "../core/framework/Utils";
 import FinalWindow from "./FinalWindow";
+import VideoOverlay from "./video/VideoOverlay";
 
 import PuppetCharacter from "./puppet/PuppetCharacter";
 import PuppetAnimator from "./puppet/PuppetAnimator";
@@ -241,6 +242,11 @@ export default class Game extends ParentScene {
             onCta: () => this._onCta()
         });
 
+        this.videoOverlay = new VideoOverlay(this, {
+            onCta: () => this._onCta(),
+            onRetry: () => this._onCta()
+        });
+
         // Dedicated non-zoomed UI camera for FinalWindow and finale CTA buttons
         this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
         this.uiCamera.setScroll(0, 0);
@@ -253,6 +259,7 @@ export default class Game extends ParentScene {
             balance: this.balanceView,
             choices: this.choiceGroup,
             finalWindow: this.finalWindow,
+            videoOverlay: this.videoOverlay,
             worldContainer: this.worldContainer,
             setHouseBackground: (choiceId) => {
                 const tex = (choiceId === 'choice_simple') ? 'simple_house_bg' : 'luxury_house_bg';
@@ -405,6 +412,10 @@ export default class Game extends ParentScene {
         // 4. Update Story Controller layout (characters, offsets, crowd spacing, UI)
         if (this.storyController && typeof this.storyController.updateLayout === 'function') {
             this.storyController.updateLayout(isPortrait);
+        }
+
+        if (this.videoOverlay && typeof this.videoOverlay.onResize === 'function') {
+            this.videoOverlay.onResize(isPortrait);
         }
 
         // 5. Update UI elements layout (proportionately scaled and anchored to camera framing)

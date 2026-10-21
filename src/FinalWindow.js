@@ -101,6 +101,11 @@ export default class FinalWindow {
         } else if (buttons && typeof buttons === 'object') {
             options = Object.assign({}, buttons, options);
         }
+        if (this._scene?.videoOverlay && (window.App?.resources?.video?.pre_final || window.App?.resources?.videos?.pre_final)) {
+            this._scene.videoOverlay.startTransition();
+            return;
+        }
+
         this._isShown = true;
         this._handDismissed = false;
 

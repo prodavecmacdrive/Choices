@@ -2737,10 +2737,14 @@ export default class StoryController {
                 this.scene.time.delayedCall(1100, () => {
                     this._stopAllWalkSounds();
                     this._zoomInOnHero(() => {
-                        if (this.ui.finalWindow) {
-                            this.ui.finalWindow.show();
+                        if (this.ui.videoOverlay && (window.App?.resources?.video?.pre_final || window.App?.resources?.videos?.pre_final)) {
+                            this.ui.videoOverlay.startTransition();
+                        } else {
+                            if (this.ui.finalWindow) {
+                                this.ui.finalWindow.show();
+                            }
+                            this._createFinaleButtons();
                         }
-                        this._createFinaleButtons();
                     });
                 });
             });
@@ -3046,10 +3050,14 @@ export default class StoryController {
                             this.scene.time.delayedCall(1000, () => {
                                 this._stopAllWalkSounds();
                                 this._zoomInOnHero(() => {
-                                    if (this.ui.finalWindow) {
-                                        this.ui.finalWindow.show();
+                                    if (this.ui.videoOverlay && (window.App?.resources?.video?.pre_final || window.App?.resources?.videos?.pre_final)) {
+                                        this.ui.videoOverlay.startTransition();
+                                    } else {
+                                        if (this.ui.finalWindow) {
+                                            this.ui.finalWindow.show();
+                                        }
+                                        this._createFinaleButtons();
                                     }
-                                    this._createFinaleButtons();
                                 });
                             });
                         }
@@ -3155,7 +3163,7 @@ export default class StoryController {
             text: '',
             align: 'Center',
             px: -120,
-            py: 320,
+            py: 196, // Raised by 1.5 button heights (was 320; 320 - 124 = 196)
             lx: -140,
             ly: 290,
             pScaleX: 0,
@@ -3179,7 +3187,7 @@ export default class StoryController {
             text: '',
             align: 'Center',
             px: 120,
-            py: 320,
+            py: 196, // Raised by 1.5 button heights (was 320; 320 - 124 = 196)
             lx: 140,
             ly: 290,
             pScaleX: 0,
