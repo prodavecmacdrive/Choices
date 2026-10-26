@@ -1,6 +1,4 @@
 import Utils from "../core/framework/Utils";
-import Button from "./Button";
-import SETTINGS from "../final-window-settings.json";
 
 export default class FinalWindow {
     constructor({ scene, container, onCta }) {
@@ -9,15 +7,17 @@ export default class FinalWindow {
         this._onCta = onCta;
         this._lastCtaTime = 0;
 
-        this._buttons = [];
         this._isShown = false;
         this._handDismissed = false;
+        this._overlay = null;
+        this._finalImg = null;
+        this._btnRestart = null;
+        this._btnTryAgain = null;
         this._helperHand = null;
         this._helperHandTimer = null;
-        this._helperHandSequenceTimer = null;
+        this._buttons = [];
 
         this._buildOverlay();
-        this._buildButton();
 
         if (this._scene?.input) {
             this._scene.input.on('pointerdown', this._onPointerDown, this);
@@ -34,88 +34,55 @@ export default class FinalWindow {
 
     setButtons(buttons) {
         this._buttons = buttons || [];
-        if (this._isShown && !this._handDismissed) {
-            this._startHelperHandTimer();
-        }
     }
 
     _buildOverlay() {
-        const overlayCfg = SETTINGS.overlay || { color: "#000000", fillAlpha: 0.7, depth: 100 };
-        const color = overlayCfg.color ? parseInt(overlayCfg.color.replace("#", ""), 16) : 0x000000;
-        const fillAlpha = overlayCfg.fillAlpha !== undefined ? overlayCfg.fillAlpha : 0.7;
-
         this._overlay = this._scene.add.graphics();
-        this._overlay.fillStyle(color, fillAlpha);
-        this._overlay.fillRect(-3000, -3000, 6000, 6000);
-        this._overlay.setCustomPosition(0, 0);
-        this._overlay.setDepth(overlayCfg.depth || 100);
+        this._renderDimmer();
+        this._overlay.setDepth(100);
         this._overlay.setAlpha(0);
 
         this._container.add(this._overlay);
     }
 
-    _buildButton() {
-        const btnCfg = SETTINGS.button || {
-            texture: "ui_button",
-            text: "Install",
-            align: "Center",
-            portraitX: 0,
-            portraitY: 0,
-            landscapeX: 0,
-            landscapeY: 0,
-            pScale: 0.6,
-            lScale: 0.6,
-            depth: 105
-        };
+    _renderDimmer() {
+        if (!this._overlay) return;
+        this._overlay.clear();
 
-        this._pScale = btnCfg.pScale ?? 0.6;
-        this._lScale = btnCfg.lScale ?? 0.6;
+        const width = this._scene.scale?.width || 600;
+        const height = this._scene.scale?.height || 900;
+        const appScale = Math.min(width / 600, height / 900) || 1;
+        const screenW = width / appScale;
+        const screenH = height / appScale;
 
-        this._btnInstall = new Button({
-            scene: this._scene,
-            container: this._container,
-            texture: btnCfg.texture || "ui_button",
-            text: btnCfg.text || "Install",
-            align: btnCfg.align || "Center",
-            px: btnCfg.portraitX ?? 0,
-            py: btnCfg.portraitY ?? 0,
-            lx: btnCfg.landscapeX ?? 0,
-            ly: btnCfg.landscapeY ?? 0,
-            pScaleX: 0,
-            pScaleY: 0,
-            lScaleX: 0,
-            lScaleY: 0,
-            depth: btnCfg.depth || 105,
-            callback: () => this._handleCtaClick()
-        });
+        const leftX = 300 - (screenW / 2) - 100;
+        const topY = 450 - (screenH / 2) - 100;
+        const totalW = screenW + 200;
+        const totalH = screenH + 200;
+
+        this._overlay.fillStyle(0x000000, 0.75);
+        this._overlay.fillRect(leftX, topY, totalW, totalH);
     }
 
     setVisible(visible) {
-        this._overlay.setVisible(visible);
-        this._btnInstall.setVisible(visible);
+        if (this._overlay) this._overlay.setVisible(visible);
+        if (this._finalImg) this._finalImg.setVisible(visible);
+        if (this._btnRestart) this._btnRestart.setVisible(visible);
+        if (this._btnTryAgain) this._btnTryAgain.setVisible(visible);
+        if (this._helperHand) this._helperHand.setVisible(visible);
     }
 
-    show(buttons = null, options = {}) {
-        if (Array.isArray(buttons)) {
-            this._buttons = buttons;
-        } else if (buttons && typeof buttons === 'object') {
-            options = Object.assign({}, buttons, options);
-        }
-        if (this._scene?.videoOverlay && (window.App?.resources?.video?.pre_final || window.App?.resources?.videos?.pre_final)) {
-            this._scene.videoOverlay.startTransition();
-            return;
-        }
-
+    show(options = {}) {
+        if (this._isShown) return;
         this._isShown = true;
         this._handDismissed = false;
 
-        const isSuccess = !!options.isSuccess;
         if (typeof window.trackAxonEvent === 'function') {
-            window.trackAxonEvent(isSuccess ? 'CHALLENGE_SOLVED' : 'CHALLENGE_FAILED');
+            window.trackAxonEvent('CHALLENGE_FAILED');
             window.trackAxonEvent('ENDCARD_SHOWN');
         }
 
-        // Explicitly stop all character movement and looping footstep/walk SFX
+        // Stop all character movement and looping footstep/walk SFX
         if (this._scene?.storyController && typeof this._scene.storyController.stopAllWalkSounds === 'function') {
             this._scene.storyController.stopAllWalkSounds();
         } else if (this._scene?.storyController && typeof this._scene.storyController._stopAllWalkSounds === 'function') {
@@ -138,169 +105,180 @@ export default class FinalWindow {
 
         this.setVisible(true);
 
-        // Fade in overlay
-        const targetAlpha = (SETTINGS.overlay && SETTINGS.overlay.fillAlpha !== undefined)
-            ? 1
-            : 1;
+        const width = this._scene.scale?.width || 600;
+        const height = this._scene.scale?.height || 900;
+        const appScale = Math.min(width / 600, height / 900) || 1;
+        const screenW = width / appScale;
+        const screenH = height / appScale;
+        const isPortrait = width < height;
+        const screenTop = 450 - (screenH / 2);
 
+        // 1. Dimmer Overlay Fade In
+        this._renderDimmer();
+        this._overlay.setAlpha(0);
         this._scene.tweens.add({
             targets: this._overlay,
-            alpha: targetAlpha,
+            alpha: 1,
             duration: 350,
-            ease: 'Power2.easeOut'
+            ease: 'Quad.easeOut'
         });
 
-        // Animate button entrance
+        // 2. Graphic (final_img.png): Centered horizontally in the upper-middle section of screen above overlay
+        const finalScale = isPortrait ? 1.05 : 0.72;
+        const finalY = screenTop + (screenH * (isPortrait ? 0.33 : 0.28));
+
+        if (!this._finalImg || !this._finalImg.active) {
+            this._finalImg = this._scene.add.image(300, finalY, 'final_img');
+            this._finalImg.setOrigin(0.5, 0.5);
+            this._finalImg.setDepth(105);
+            this._container.add(this._finalImg);
+        } else {
+            this._finalImg.setPosition(300, finalY);
+            this._finalImg.setVisible(true);
+        }
+        this._finalImg.setScale(0);
+
         this._scene.tweens.add({
-            targets: this._btnInstall,
-            pScaleX: this._pScale,
-            pScaleY: this._pScale,
-            lScaleX: this._lScale,
-            lScaleY: this._lScale,
-            duration: 450,
+            targets: this._finalImg,
+            scaleX: finalScale,
+            scaleY: finalScale,
+            duration: 500,
+            delay: 150,
+            ease: 'Back.easeOut'
+        });
+
+        // 3. Dual Action Buttons: Two interactive buttons placed side-by-side beneath final_img.png
+        // Left: btn_restart_red.png, Right: btn_try_again_green.png
+        const btnScale = isPortrait ? 0.46 : 0.36;
+        const btnSpacing = isPortrait ? 122 : 130;
+        const btnY = finalY + (isPortrait ? 180 : 152);
+
+        const restartX = 300 - btnSpacing;
+        const tryAgainX = 300 + btnSpacing;
+
+        // Restart (red)
+        if (!this._btnRestart || !this._btnRestart.active) {
+            this._btnRestart = this._scene.add.image(restartX, btnY, 'btn_restart_red');
+            this._btnRestart.setOrigin(0.5, 0.5);
+            this._btnRestart.setDepth(110);
+            this._btnRestart.setInteractive({ useHandCursor: true });
+            this._container.add(this._btnRestart);
+        } else {
+            this._btnRestart.setPosition(restartX, btnY);
+            this._btnRestart.setVisible(true);
+            this._btnRestart.setInteractive({ useHandCursor: true });
+        }
+        this._btnRestart.setScale(0);
+
+        // Try Again (green)
+        if (!this._btnTryAgain || !this._btnTryAgain.active) {
+            this._btnTryAgain = this._scene.add.image(tryAgainX, btnY, 'btn_try_again_green');
+            this._btnTryAgain.setOrigin(0.5, 0.5);
+            this._btnTryAgain.setDepth(110);
+            this._btnTryAgain.setInteractive({ useHandCursor: true });
+            this._container.add(this._btnTryAgain);
+        } else {
+            this._btnTryAgain.setPosition(tryAgainX, btnY);
+            this._btnTryAgain.setVisible(true);
+            this._btnTryAgain.setInteractive({ useHandCursor: true });
+        }
+        this._btnTryAgain.setScale(0);
+
+        this._scene.tweens.add({
+            targets: [this._btnRestart, this._btnTryAgain],
+            scaleX: btnScale,
+            scaleY: btnScale,
+            duration: 500,
+            delay: 300,
             ease: 'Back.easeOut',
             onComplete: () => {
-                this._startPulseAnimation();
+                this._startPulseAnimation(btnScale);
+                this._spawnHelperHand();
             }
         });
 
-        // 1-second delay before helper hand prompts on buttons
-        this._startHelperHandTimer();
+        // Click handlers
+        const onButtonClick = (btnObj) => {
+            try {
+                Utils.addAudio(this._scene, 'click', 1.0);
+            } catch (e) { }
+
+            this._clearHelperHand();
+
+            this._scene.tweens.add({
+                targets: btnObj,
+                scaleX: btnScale * 0.9,
+                scaleY: btnScale * 0.9,
+                duration: 90,
+                yoyo: true,
+                onComplete: () => {
+                    this._handleCtaClick();
+                }
+            });
+        };
+
+        this._btnRestart.off('pointerdown');
+        this._btnRestart.on('pointerdown', () => onButtonClick(this._btnRestart));
+
+        this._btnTryAgain.off('pointerdown');
+        this._btnTryAgain.on('pointerdown', () => onButtonClick(this._btnTryAgain));
     }
 
-    _startHelperHandTimer() {
-        if (this._handDismissed || !this._isShown) return;
-        if (this._helperHandTimer) {
-            this._helperHandTimer.remove();
-            this._helperHandTimer = null;
-        }
-
-        this._helperHandTimer = this._scene.time.delayedCall(1000, () => {
-            this._startHelperHand();
-        });
-    }
-
-    _startHelperHand() {
-        if (this._handDismissed || !this._isShown) return;
-        if (!this._scene || !this._scene.textures.exists('helper_hand')) return;
-
-        let targetButtons = (this._buttons && this._buttons.length > 0)
-            ? this._buttons
-            : (this._scene.storyController?.finaleButtons?.length > 0
-                ? this._scene.storyController.finaleButtons
-                : (this._btnInstall && (this._pScale > 0 || this._lScale > 0) ? [this._btnInstall] : []));
-
-        targetButtons = targetButtons.filter(b => b && b.active && b.visible !== false);
-        if (targetButtons.length === 0) return;
-
-        if (this._helperHandSequenceTimer) {
-            this._helperHandSequenceTimer.remove();
-            this._helperHandSequenceTimer = null;
-        }
-        if (this._helperHand) {
-            this._scene.tweens.killTweensOf(this._helperHand);
-        }
+    _spawnHelperHand() {
+        if (!this._scene?.textures?.exists('helper_hand')) return;
+        if (!this._btnTryAgain || !this._btnTryAgain.active) return;
+        if (!this._isShown || this._handDismissed) return;
 
         if (!this._helperHand || !this._helperHand.active) {
             this._helperHand = this._scene.add.image(0, 0, 'helper_hand');
             this._helperHand.setOrigin(0.12, 0.05);
-            const handScale = 0.44;
-            this._helperHand.handBaseScale = handScale;
-            this._helperHand.setScale(handScale);
+            this._helperHand.setScale(0.42);
             this._helperHand.setDepth(200);
             this._container.add(this._helperHand);
-
-            const firstBtn = targetButtons[0];
-            this._helperHand.setPosition(firstBtn.x + 35, firstBtn.y + 60);
-            this._helperHand.setAlpha(0);
         }
 
-        this._runHelperHandLoop(targetButtons, 0);
-    }
+        const targetBtn = this._btnTryAgain;
+        const handX = targetBtn.x + 25;
+        const handY = targetBtn.y + 25;
 
-    _runHelperHandLoop(targetButtons, index = 0) {
-        if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
-        if (!targetButtons || targetButtons.length === 0) return;
+        this._helperHand.setPosition(handX + 25, handY + 25);
+        this._helperHand.setAlpha(0);
+        this._helperHand.setVisible(true);
 
-        const btn = targetButtons[index % targetButtons.length];
-        if (!btn || !btn.active) return;
-
-        const targetX = btn.x + 15;
-        const targetY = btn.y + 15;
-        const baseScale = this._helperHand.handBaseScale || 0.44;
-
-        // 1. Move hand to button
         this._scene.tweens.add({
             targets: this._helperHand,
-            x: targetX,
-            y: targetY,
+            x: handX,
+            y: handY,
             alpha: 1,
-            duration: 380,
+            duration: 300,
             ease: 'Cubic.easeOut',
             onComplete: () => {
-                if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
-
-                // 2. Simulate click: press hand down and button down
+                if (!this._helperHand || !this._helperHand.active || !this._isShown || this._handDismissed) return;
                 this._scene.tweens.add({
                     targets: this._helperHand,
-                    scaleX: baseScale * 0.86,
-                    scaleY: baseScale * 0.86,
-                    y: targetY + 10,
-                    duration: 130,
-                    ease: 'Quad.easeInOut'
-                });
-
-                if (btn.buttonImage) {
-                    this._scene.tweens.add({
-                        targets: btn.buttonImage,
-                        scaleX: 0.92,
-                        scaleY: 0.92,
-                        duration: 130,
-                        ease: 'Quad.easeInOut'
-                    });
-                }
-
-                this._scene.time.delayedCall(130, () => {
-                    if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
-
-                    // Release simulated click
-                    this._scene.tweens.add({
-                        targets: this._helperHand,
-                        scaleX: baseScale,
-                        scaleY: baseScale,
-                        y: targetY,
-                        duration: 150,
-                        ease: 'Quad.easeInOut'
-                    });
-
-                    if (btn.buttonImage) {
-                        this._scene.tweens.add({
-                            targets: btn.buttonImage,
-                            scaleX: 1.0,
-                            scaleY: 1.0,
-                            duration: 150,
-                            ease: 'Quad.easeInOut'
-                        });
-                    }
-
-                    this._scene.time.delayedCall(150, () => {
-                        if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
-
-                        // Pause before moving to next target button
-                        this._helperHandSequenceTimer = this._scene.time.delayedCall(450, () => {
-                            if (this._handDismissed || !this._isShown || !this._helperHand || !this._helperHand.active) return;
-
-                            let currentTargets = (this._buttons && this._buttons.length > 0)
-                                ? this._buttons
-                                : (this._scene.storyController?.finaleButtons || targetButtons);
-                            currentTargets = currentTargets.filter(b => b && b.active && b.visible !== false);
-                            if (currentTargets.length === 0) currentTargets = targetButtons;
-
-                            this._runHelperHandLoop(currentTargets, index + 1);
-                        });
-                    });
+                    scaleX: 0.36,
+                    scaleY: 0.36,
+                    y: handY + 10,
+                    duration: 180,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
                 });
             }
+        });
+    }
+
+    _startPulseAnimation(baseScale = 0.46) {
+        if (!this._btnRestart || !this._btnTryAgain) return;
+        this._scene.tweens.killTweensOf([this._btnRestart, this._btnTryAgain]);
+        this._scene.tweens.add({
+            targets: [this._btnRestart, this._btnTryAgain],
+            scaleX: baseScale * 1.05,
+            scaleY: baseScale * 1.05,
+            duration: 750,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
         });
     }
 
@@ -310,38 +288,48 @@ export default class FinalWindow {
             this._helperHandTimer.remove();
             this._helperHandTimer = null;
         }
-        if (this._helperHandSequenceTimer) {
-            this._helperHandSequenceTimer.remove();
-            this._helperHandSequenceTimer = null;
-        }
         if (this._helperHand) {
             this._scene.tweens.killTweensOf(this._helperHand);
             this._helperHand.destroy();
             this._helperHand = null;
         }
-        const buttons = (this._buttons && this._buttons.length > 0)
-            ? this._buttons
-            : (this._scene.storyController?.finaleButtons || []);
-        buttons.forEach(btn => {
-            if (btn && btn.buttonImage) {
-                this._scene.tweens.killTweensOf(btn.buttonImage);
-                btn.buttonImage.setScale(1.0);
-            }
-        });
     }
 
-    _startPulseAnimation() {
-        this._scene.tweens.add({
-            targets: this._btnInstall,
-            pScaleX: this._pScale * 1.06,
-            pScaleY: this._pScale * 1.06,
-            lScaleX: this._lScale * 1.06,
-            lScaleY: this._lScale * 1.06,
-            duration: 800,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
+    onResize(isPortrait) {
+        if (!this._isShown) return;
+
+        this._renderDimmer();
+
+        const width = this._scene.scale?.width || 600;
+        const height = this._scene.scale?.height || 900;
+        const appScale = Math.min(width / 600, height / 900) || 1;
+        const screenW = width / appScale;
+        const screenH = height / appScale;
+        const screenTop = 450 - (screenH / 2);
+
+        const finalScale = isPortrait ? 1.05 : 0.72;
+        const finalY = screenTop + (screenH * (isPortrait ? 0.33 : 0.28));
+
+        if (this._finalImg && this._finalImg.active) {
+            this._finalImg.setPosition(300, finalY);
+            this._finalImg.setScale(finalScale);
+        }
+
+        const btnScale = isPortrait ? 0.46 : 0.36;
+        const btnSpacing = isPortrait ? 122 : 130;
+        const btnY = finalY + (isPortrait ? 180 : 152);
+
+        if (this._btnRestart && this._btnRestart.active) {
+            this._btnRestart.setPosition(300 - btnSpacing, btnY);
+            this._btnRestart.setScale(btnScale);
+        }
+        if (this._btnTryAgain && this._btnTryAgain.active) {
+            this._btnTryAgain.setPosition(300 + btnSpacing, btnY);
+            this._btnTryAgain.setScale(btnScale);
+        }
+        if (this._helperHand && this._helperHand.active) {
+            this._helperHand.setPosition(300 + btnSpacing + 25, btnY + 25);
+        }
     }
 
     _handleCtaClick() {
@@ -349,6 +337,11 @@ export default class FinalWindow {
         const now = performance.now();
         if (now - this._lastCtaTime < 500) return;
         this._lastCtaTime = now;
+
+        if (typeof window.trackAxonEvent === 'function') {
+            window.trackAxonEvent('CHALLENGE_RETRY');
+            window.trackAxonEvent('ENDCARD_CLICK');
+        }
 
         if (this._onCta) {
             this._onCta();

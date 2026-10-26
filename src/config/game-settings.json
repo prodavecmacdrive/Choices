@@ -1,4 +1,5 @@
 {
+  "startAct": 1,
   "initialBalance": 500000,
   "economy": {
     "initialBalance": 500000,

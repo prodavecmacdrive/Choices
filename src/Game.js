@@ -1,7 +1,7 @@
 import ParentScene from "../core/framework/components/Scene";
 import Utils from "../core/framework/Utils";
 import FinalWindow from "./FinalWindow";
-import VideoOverlay from "./video/VideoOverlay";
+import Act2Controller from "./act2/Act2Controller";
 
 import PuppetCharacter from "./puppet/PuppetCharacter";
 import PuppetAnimator from "./puppet/PuppetAnimator";
@@ -23,6 +23,7 @@ import FRIEND5_CONFIG from "./config/character_friend5.json";
 import STORY_CONFIG from "./config/story.json";
 import UI_CONFIG from "./config/ui.json";
 import BASE_SETTINGS from "../game-settings.json";
+import CONFIG_SETTINGS from "./config/game-settings.json";
 
 export default class Game extends ParentScene {
     init(data) {
@@ -31,7 +32,15 @@ export default class Game extends ParentScene {
             : (window.App?.stateManager ? window.App.stateManager.getNextScene() : (window.App?.flow && window.App.flow[0])) || 'scene-1';
 
         const sceneData = (window.App?.scenesData && window.App.scenesData[this._sceneId]) || {};
-        this.SETTINGS = Object.assign({}, BASE_SETTINGS, sceneData);
+        this.SETTINGS = Object.assign({}, CONFIG_SETTINGS, BASE_SETTINGS, sceneData);
+
+        // Interaction limits and countdown timer configurations
+        this.maxClicks = Number(this.SETTINGS?.maxClicks) || 0;
+        this.timeLimitSec = Number(this.SETTINGS?.timeLimitSec) || (this.SETTINGS?.timeLimit ? Math.round(this.SETTINGS.timeLimit / 1000) : 0);
+        this.clickCount = 0;
+        this.isGameOver = false;
+        this._timerStarted = false;
+        this._timerEvent = null;
     }
 
     create() {
@@ -43,6 +52,7 @@ export default class Game extends ParentScene {
                 if (typeof window.trackAxonEvent === 'function') {
                     window.trackAxonEvent('CHALLENGE_STARTED');
                 }
+                this.startTimerIfNeeded();
             });
         }
 
@@ -242,16 +252,15 @@ export default class Game extends ParentScene {
             onCta: () => this._onCta()
         });
 
-        this.videoOverlay = new VideoOverlay(this, {
-            onCta: () => this._onCta(),
-            onRetry: () => this._onCta()
+        this.act2Controller = new Act2Controller(this, {
+            onCta: () => this._onCta()
         });
 
         // Dedicated non-zoomed UI camera for FinalWindow and finale CTA buttons
         this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height);
         this.uiCamera.setScroll(0, 0);
         this.uiCamera.setZoom(1.0);
-        this.uiCamera.ignore([this.worldContainer, this.balanceView, this.choiceGroup]);
+        this.uiCamera.ignore([this.worldContainer, this.balanceView, this.choiceGroup, this.act2Controller.rootContainer]);
         this.cameras.main.ignore(this.finaleContainer);
 
         // 5. Story Controller
@@ -259,7 +268,7 @@ export default class Game extends ParentScene {
             balance: this.balanceView,
             choices: this.choiceGroup,
             finalWindow: this.finalWindow,
-            videoOverlay: this.videoOverlay,
+            act2Controller: this.act2Controller,
             worldContainer: this.worldContainer,
             setHouseBackground: (choiceId) => {
                 const tex = (choiceId === 'choice_simple') ? 'simple_house_bg' : 'luxury_house_bg';
@@ -292,7 +301,32 @@ export default class Game extends ParentScene {
         this.applyCameraSettings();
         this.onResize();
 
-        this.storyController.start();
+        const startAct = BASE_SETTINGS?.startAct ?? this.SETTINGS?.startAct ?? 1;
+        if (startAct === 2) {
+            // Skip Act 1 entirely and immediately boot into Act 2
+            if (this.worldContainer) this.worldContainer.setVisible(false);
+            if (this.choiceGroup) {
+                this.choiceGroup.setVisible(false);
+                this.choiceGroup.disableAllInteractivity?.();
+            }
+
+            // Cleanly setup standalone BalanceView state
+            if (this.balanceView) {
+                this.balanceView.setBalance(0);
+                this.balanceView.setVisible(false);
+            }
+
+            // Cleanly start background music
+            if (this.storyController) {
+                this.storyController._startMainBgm();
+            }
+
+            // Immediately boot into Act 2 (Dumpster Alley Scene)
+            this.act2Controller.start({ immediate: true, standalone: true });
+        } else {
+            // startAct === 1 (Default): Normal gameplay starting at Act 1
+            this.storyController.start();
+        }
     }
 
     onResize() {
@@ -414,8 +448,8 @@ export default class Game extends ParentScene {
             this.storyController.updateLayout(isPortrait);
         }
 
-        if (this.videoOverlay && typeof this.videoOverlay.onResize === 'function') {
-            this.videoOverlay.onResize(isPortrait);
+        if (this.act2Controller && typeof this.act2Controller.onResize === 'function') {
+            this.act2Controller.onResize(isPortrait);
         }
 
         // 5. Update UI elements layout (proportionately scaled and anchored to camera framing)
@@ -430,6 +464,13 @@ export default class Game extends ParentScene {
         }
         if (this.choiceGroup && typeof this.choiceGroup.updateLayout === 'function') {
             this.choiceGroup.updateLayout(isPortrait, screenWidth, screenHeight, cameraContext);
+        }
+
+        if (this.uiCamera) {
+            this.uiCamera.setSize(this.scale.width, this.scale.height);
+        }
+        if (this.finalWindow && typeof this.finalWindow.onResize === 'function') {
+            this.finalWindow.onResize(isPortrait);
         }
     }
 
@@ -454,6 +495,117 @@ export default class Game extends ParentScene {
         }
 
         return { zoom, offsetY, isPortrait };
+    }
+
+    startTimerIfNeeded() {
+        if (this._timerStarted || this.isGameOver) return;
+        if (this.timeLimitSec > 0) {
+            this._timerStarted = true;
+            this._timerEvent = this.time.delayedCall(this.timeLimitSec * 1000, () => {
+                this.showEndcard('timeout');
+            });
+        }
+    }
+
+    registerInteraction(source = 'interaction') {
+        if (this.isGameOver) return;
+
+        this.startTimerIfNeeded();
+
+        this.clickCount++;
+
+        if (this.maxClicks > 0 && this.clickCount >= this.maxClicks) {
+            this.showEndcard('max_clicks');
+        }
+    }
+
+    showEndcard(reason = 'condition') {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+
+        if (this._timerEvent) {
+            this._timerEvent.remove();
+            this._timerEvent = null;
+        }
+
+        // 1. Immediately hide and destroy all active choice cards, choice containers, and floor plates
+        if (this.choiceGroup) {
+            if (typeof this.choiceGroup.disableAllInteractivity === 'function') {
+                this.choiceGroup.disableAllInteractivity();
+            }
+            if (typeof this.choiceGroup._clearHelperHand === 'function') {
+                this.choiceGroup._clearHelperHand();
+            }
+            this.tweens.killTweensOf(this.choiceGroup);
+            if (typeof this.choiceGroup.clearCards === 'function') {
+                this.choiceGroup.clearCards();
+            }
+            this.choiceGroup.removeAll(true);
+            this.choiceGroup.setVisible(false);
+        }
+
+        if (this.storyController) {
+            if (typeof this.storyController.stopAllWalkSounds === 'function') {
+                this.storyController.stopAllWalkSounds();
+            }
+            if (typeof this.storyController._clearHelperHand === 'function') {
+                this.storyController._clearHelperHand();
+            }
+            if (Array.isArray(this.storyController.finaleButtons)) {
+                this.storyController.finaleButtons.forEach(btn => {
+                    if (btn && btn.destroy) btn.destroy();
+                });
+                this.storyController.finaleButtons = [];
+            }
+        }
+
+        if (this.act2Controller) {
+            if (typeof this.act2Controller.disableAllInteractivity === 'function') {
+                this.act2Controller.disableAllInteractivity();
+            }
+            if (typeof this.act2Controller._clearHelperHand === 'function') {
+                this.act2Controller._clearHelperHand();
+            }
+            if (Array.isArray(this.act2Controller.floorViews)) {
+                this.act2Controller.floorViews.forEach(floorView => {
+                    if (!floorView) return;
+                    ['labelContainer', 'darkOverlay', 'tapToOpenContainer', 'shutter', 'panelContainer'].forEach(prop => {
+                        if (floorView[prop] && floorView[prop].active) {
+                            this.tweens.killTweensOf(floorView[prop]);
+                            floorView[prop].destroy();
+                        }
+                    });
+                });
+            }
+            if (this.act2Controller.rat && this.act2Controller.rat.active) {
+                this.tweens.killTweensOf(this.act2Controller.rat);
+                this.act2Controller.rat.destroy();
+                this.act2Controller.rat = null;
+            }
+            if (this.act2Controller.moneyBag && this.act2Controller.moneyBag.active) {
+                this.tweens.killTweensOf(this.act2Controller.moneyBag);
+                this.act2Controller.moneyBag.disableInteractive?.();
+            }
+            if (this.act2Controller.speechBubble && this.act2Controller.speechBubble.active) {
+                this.tweens.killTweensOf(this.act2Controller.speechBubble);
+                this.act2Controller.speechBubble.destroy();
+                this.act2Controller.speechBubble = null;
+            }
+            if (this.act2Controller.helperHand && this.act2Controller.helperHand.active) {
+                this.tweens.killTweensOf(this.act2Controller.helperHand);
+                this.act2Controller.helperHand.destroy();
+                this.act2Controller.helperHand = null;
+            }
+        }
+
+        // 2. Render complete Endcard window
+        if (this.finalWindow) {
+            this.finalWindow.show();
+        }
+    }
+
+    triggerEndcard(reason = 'condition') {
+        this.showEndcard(reason);
     }
 
     _onCta() {

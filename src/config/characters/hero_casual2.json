@@ -1,0 +1,44 @@
+{
+    "id": "hero_casual2",
+    "atlas": null,
+    "rootScale": {
+        "x": 0.416,
+        "y": 0.416
+    },
+    "parts": {
+        "body": "hero_casual2_body",
+        "head": "hero_casual2_head",
+        "hair": "hero_casual2_hair",
+        "arm_left": "hero_casual2_arm_l",
+        "arm_right": "hero_casual2_arm_r",
+        "leg_upper_left": "hero_casual2_leg_l",
+        "leg_upper_right": "hero_casual2_leg_r",
+        "foot_left": "hero_casual2_foot_l",
+        "foot_right": "hero_casual2_foot_r"
+    },
+    "faces": {
+        "idle": "hero_casual2_face",
+        "happy": "hero_casual2_face"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {
+            "offset": {
+                "x": 0,
+                "y": -60
+            }
+        },
+        "hair": {
+            "offset": {
+                "x": 0,
+                "y": 110
+            }
+        },
+        "face": {
+            "offset": {
+                "x": 0,
+                "y": 60
+            }
+        }
+    }
+}

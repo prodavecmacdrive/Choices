@@ -1,0 +1,44 @@
+{
+    "id": "millionaire",
+    "atlas": null,
+    "rootScale": {
+        "x": 0.416,
+        "y": 0.416
+    },
+    "parts": {
+        "body": "millionaire_body",
+        "head": "millionaire_head",
+        "hair": "millionaire_hair",
+        "arm_left": "millionaire_arm_l",
+        "arm_right": "millionaire_arm_r",
+        "leg_upper_left": "millionaire_leg_l",
+        "leg_upper_right": "millionaire_leg_r",
+        "foot_left": "millionaire_foot_l",
+        "foot_right": "millionaire_foot_r"
+    },
+    "faces": {
+        "idle": "millionaire_face",
+        "happy": "millionaire_face"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {
+            "offset": {
+                "x": 0,
+                "y": -60
+            }
+        },
+        "hair": {
+            "offset": {
+                "x": 0,
+                "y": 110
+            }
+        },
+        "face": {
+            "offset": {
+                "x": 0,
+                "y": 60
+            }
+        }
+    }
+}

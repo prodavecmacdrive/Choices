@@ -1,0 +1,42 @@
+{
+  "maxClicks": 3,
+  "timeLimitSec": 0,
+  "startAct": 1,
+  "enablePartyFX": false,
+  "initialBalance": 500000,
+  "cameraSettings": {
+    "portrait": {
+      "zoom": 1.3,
+      "offsetY": 0
+    },
+    "landscape": {
+      "zoom": 1.3,
+      "offsetY": 290
+    }
+  },
+  "economy": {
+    "initialBalance": 500000,
+    "start_balance": 500000,
+    "lemonade_stand_cost": 50000,
+    "good_job_cost": 50000,
+    "default_house_cost": 200000,
+    "luxury_house_cost": 320000,
+    "date_cost": 100000,
+    "total_mess_cost": 50000,
+    "hot_model_cost": 100000,
+    "luxury_ring_cost": 200000,
+    "grandma_ring_cost": 110000
+  },
+  "button": {
+    "texture": "ui_button",
+    "text": "Click me",
+    "align": "Center",
+    "portraitX": 0,
+    "portraitY": 0,
+    "landscapeX": 0,
+    "landscapeY": 0,
+    "pScale": 0.6,
+    "lScale": 0.6,
+    "depth": 10
+  }
+}

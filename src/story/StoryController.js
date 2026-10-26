@@ -2636,7 +2636,7 @@ export default class StoryController {
             });
         };
 
-        // --- Step 3: Crowd Reaction & Mockery, Step 4: Hero Cry & Exit, Step 5: Finale Window ---
+        // --- Step 3: Crowd Reaction & Mockery, Step 4: Girl 1 Stealing Cash, Step 5: Broke Sequence & Act 2 ---
         const startMockeryAndExit = () => {
             try {
                 Utils.addAudio(this.scene, 'crowd_laugh', 1.0);
@@ -2677,25 +2677,8 @@ export default class StoryController {
                 }
             });
 
-            // --- Step 4: Hero Cry & Exit of All Characters ---
-            this.scene.time.delayedCall(400, () => {
-                this._stopAllWalkSounds();
-                if (hero) {
-                    hero.setFace('crying');
-                    hero.setAttachment('face', 'hero_face_crying');
-                    hero.animator?.playCry();
-                    if (hero.bones?.arm_left) {
-                        this.scene.tweens.add({ targets: hero.bones.arm_left, angle: 160, duration: 400, ease: 'Power1.easeOut' });
-                    }
-                    if (hero.bones?.arm_right) {
-                        this.scene.tweens.add({ targets: hero.bones.arm_right, angle: -160, duration: 400, ease: 'Power1.easeOut' });
-                    }
-                }
-            });
-
-            // Characters turn around and walk off-screen, leaving Hero completely alone
-            this.scene.time.delayedCall(1200, () => {
-                // Left group (friends & girl_2) turn left and walk off to the left
+            // Friends & Girl 2 turn around and walk off-screen to the left
+            this.scene.time.delayedCall(800, () => {
                 const leftGroup = [...friends, girl2].filter(c => !!c);
                 leftGroup.forEach((p, idx) => {
                     const s = this._getCharacterScale(p, -1); // Turn left to walk away
@@ -2714,31 +2697,176 @@ export default class StoryController {
                         }
                     });
                 });
+            });
 
-                // Girl 1 (on the right) turns right and walks off to the right
-                if (girl1) {
-                    const s = this._getCharacterScale(girl1, 1); // Turn right to walk away
-                    girl1.setScale(s.x, s.y);
-                    girl1.animator?.playWalk({ speed: 0.7 });
-                    this.scene.tweens.add({
-                        targets: girl1,
-                        x: girl1.x + 900,
-                        duration: 1800,
-                        ease: 'Power1.easeIn',
-                        onComplete: () => {
-                            girl1.setVisible(false);
-                            girl1.animator?.stopAll();
-                            this._stopAllWalkSounds();
-                        }
-                    });
+            // --- Step 4: Girl 1 Stealing Cash Sequence ---
+            this.scene.time.delayedCall(950, () => {
+                if (!girl1) {
+                    proceedToFailAndAct2();
+                    return;
                 }
 
-                // --- Step 5: Finale Window (Camera zooms in on crying Hero who stays in place) ---
-                this.scene.time.delayedCall(1100, () => {
-                    this._stopAllWalkSounds();
+                // 1. Approach Hero: Instead of walking off, Girl 1 turns and steps closely toward Hero
+                const girl1FaceLeft = this._getCharacterScale(girl1, -1);
+                girl1.setScale(girl1FaceLeft.x, girl1FaceLeft.y);
+                girl1.animator?.playWalk({ speed: 0.8 });
+
+                const targetContactX = hero ? (hero.x + 65) : (girl1.x - 65);
+
+                this.scene.tweens.add({
+                    targets: girl1,
+                    x: targetContactX,
+                    duration: 520,
+                    ease: 'Power1.easeOut',
+                    onComplete: () => {
+                        girl1.animator?.stopAll();
+                        girl1.resetPose();
+                        girl1.setFace('happy');
+
+                        // 2. Reach & Grab: Extend arm toward Hero's torso/pocket
+                        if (girl1.bones?.arm_left) {
+                            girl1.bones.arm_left.setDepth(40);
+                            this.scene.tweens.add({
+                                targets: girl1.bones.arm_left,
+                                angle: 68,
+                                duration: 240,
+                                ease: 'Back.easeOut'
+                            });
+                        }
+
+                        // Spawn cash.png at contact point (Hero's torso/pocket)
+                        const cashStartX = hero ? (hero.x + 18) : (girl1.x - 40);
+                        const cashStartY = hero ? (hero.y - 12) : (this.groundY - 12);
+
+                        const cash = this.scene.add.image(cashStartX, cashStartY, 'cash');
+                        cash.setScale(0.12);
+                        cash.setDepth(35);
+                        if (this.ui.worldContainer) {
+                            this.ui.worldContainer.add(cash);
+                        }
+
+                        try {
+                            Utils.addAudio(this.scene, 'money_spend', 1.0);
+                        } catch (e) { }
+
+                        // Deduct remaining balance from BalanceView
+                        if (this.ui.balance && this.ui.balance.getValue() > 0) {
+                            this.ui.balance.subtract(this.ui.balance.getValue(), 400, true);
+                        }
+
+                        // Hero transitions into distressed/shocked expression
+                        if (hero) {
+                            hero.setFace('surprised');
+                            hero.setAttachment('face', 'hero_face_surprised');
+                            if (hero.bones?.body) {
+                                this.scene.tweens.add({
+                                    targets: hero.bones.body,
+                                    angle: -10,
+                                    duration: 180,
+                                    yoyo: true,
+                                    ease: 'Back.easeOut'
+                                });
+                            }
+                            if (hero.bones?.arm_left) {
+                                this.scene.tweens.add({ targets: hero.bones.arm_left, angle: 45, duration: 200 });
+                            }
+                            if (hero.bones?.arm_right) {
+                                this.scene.tweens.add({ targets: hero.bones.arm_right, angle: -45, duration: 200 });
+                            }
+                        }
+
+                        // Calculate exact hand position in worldContainer space
+                        let targetHandX = girl1.x - 37;
+                        let targetHandY = cashStartY;
+                        if (girl1.bones?.arm_left) {
+                            const arm = girl1.bones.arm_left;
+                            const rad = ((arm.angle || 68) * Math.PI) / 180;
+                            const inArmX = -72 * Math.sin(rad);
+                            const inArmY = 72 * Math.cos(rad);
+                            const inGirlX = (arm.x || 155) + inArmX;
+                            const inGirlY = (arm.y || -30) + inArmY;
+                            targetHandX = girl1.x + inGirlX * (girl1.scaleX || -0.416);
+                            targetHandY = girl1.y + inGirlY * Math.abs(girl1.scaleY || 0.416);
+                        }
+
+                        const finalLocalScale = 0.44;
+                        const finalWorldScale = finalLocalScale * Math.abs(girl1.scaleX || 0.416);
+
+                        // Cash pulls out toward Girl 1's hand
+                        this.scene.tweens.add({
+                            targets: cash,
+                            x: targetHandX,
+                            y: targetHandY,
+                            scaleX: finalWorldScale,
+                            scaleY: finalWorldScale,
+                            duration: 220,
+                            ease: 'Quad.easeOut',
+                            onComplete: () => {
+                                // Attach cash.png to girl_1's hand container (arm_left)
+                                if (girl1.bones?.arm_left) {
+                                    cash.destroy();
+                                    const heldCash = this.scene.add.image(2, 72, 'cash');
+                                    heldCash.setScale(finalLocalScale);
+                                    heldCash.setOrigin(0.5, 0.45);
+                                    heldCash.setDepth(20);
+                                    girl1.bones.arm_left.add(heldCash);
+                                    girl1.heldCash = heldCash;
+                                }
+
+                                // 3. Exit with Cash: Girl 1 turns around and plays walking animation off-screen
+                                this.scene.time.delayedCall(380, () => {
+                                    const girl1FaceRight = this._getCharacterScale(girl1, 1);
+                                    girl1.setScale(girl1FaceRight.x, girl1FaceRight.y);
+                                    if (girl1.bones?.arm_left) {
+                                        girl1.bones.arm_left.angle = 20;
+                                    }
+                                    girl1.animator?.playWalk({ speed: 0.85 });
+
+                                    this.scene.tweens.add({
+                                        targets: girl1,
+                                        x: girl1.x + 950,
+                                        duration: 1600,
+                                        ease: 'Power1.easeIn',
+                                        onComplete: () => {
+                                            girl1.setVisible(false);
+                                            girl1.animator?.stopAll();
+                                            this._stopAllWalkSounds();
+                                        }
+                                    });
+
+                                    // 4. Transition Continuity: Once girl_1 leaves visible area, proceed with Broke sequence & Act 2
+                                    this.scene.time.delayedCall(1100, () => {
+                                        proceedToFailAndAct2();
+                                    });
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Helper to transition into the "Broke!" state, crying Hero, and Act 2
+            const proceedToFailAndAct2 = () => {
+                this._stopAllWalkSounds();
+                if (hero) {
+                    hero.setFace('crying');
+                    hero.setAttachment('face', 'hero_face_crying');
+                    hero.animator?.playCry();
+                    if (hero.bones?.arm_left) {
+                        this.scene.tweens.add({ targets: hero.bones.arm_left, angle: 160, duration: 400, ease: 'Power1.easeOut' });
+                    }
+                    if (hero.bones?.arm_right) {
+                        this.scene.tweens.add({ targets: hero.bones.arm_right, angle: -160, duration: 400, ease: 'Power1.easeOut' });
+                    }
+                }
+
+                // Proceed seamlessly with remaining Act 1 fail sequence ("Broke!" banner)
+                this._runBrokeSequence(() => {
                     this._zoomInOnHero(() => {
-                        if (this.ui.videoOverlay && (window.App?.resources?.video?.pre_final || window.App?.resources?.videos?.pre_final)) {
-                            this.ui.videoOverlay.startTransition();
+                        if (this.ui.act2Controller) {
+                            this.ui.act2Controller.start();
+                        } else if (this.scene.act2Controller) {
+                            this.scene.act2Controller.start();
                         } else {
                             if (this.ui.finalWindow) {
                                 this.ui.finalWindow.show();
@@ -2747,7 +2875,7 @@ export default class StoryController {
                         }
                     });
                 });
-            });
+            };
         };
     }
 
@@ -3050,8 +3178,10 @@ export default class StoryController {
                             this.scene.time.delayedCall(1000, () => {
                                 this._stopAllWalkSounds();
                                 this._zoomInOnHero(() => {
-                                    if (this.ui.videoOverlay && (window.App?.resources?.video?.pre_final || window.App?.resources?.videos?.pre_final)) {
-                                        this.ui.videoOverlay.startTransition();
+                                    if (this.ui.act2Controller) {
+                                        this.ui.act2Controller.start();
+                                    } else if (this.scene.act2Controller) {
+                                        this.scene.act2Controller.start();
                                     } else {
                                         if (this.ui.finalWindow) {
                                             this.ui.finalWindow.show();

@@ -3,7 +3,7 @@ export default class PuppetCharacter extends Phaser.GameObjects.Container {
         super(scene, x, y);
         this.scene = scene;
         this.skeleton = skeletonConfig;
-        this.skin = characterConfig;
+        this.skin = characterConfig ? JSON.parse(JSON.stringify(characterConfig)) : {};
         if (this.skin) {
             this.skin.setAttachment = (boneName, textureName) => {
                 this.setAttachment(boneName, textureName);
@@ -166,8 +166,10 @@ export default class PuppetCharacter extends Phaser.GameObjects.Container {
 
     setAttachment(boneName, textureName) {
         let actualBone = boneName;
-        if (boneName === 'leg_left') actualBone = 'leg_upper_left';
-        if (boneName === 'leg_right') actualBone = 'leg_upper_right';
+        if (boneName === 'leg_left' || boneName === 'leg_l') actualBone = 'leg_upper_left';
+        if (boneName === 'leg_right' || boneName === 'leg_r') actualBone = 'leg_upper_right';
+        if (boneName === 'arm_l') actualBone = 'arm_left';
+        if (boneName === 'arm_r') actualBone = 'arm_right';
 
         if (actualBone === 'face') {
             if (this.faceSprite) {
@@ -195,6 +197,87 @@ export default class PuppetCharacter extends Phaser.GameObjects.Container {
         if (this.skin && this.skin.parts) {
             this.skin.parts[actualBone] = textureName;
         }
+    }
+
+    applySkin(skinConfig) {
+        if (!skinConfig) return;
+        this.skin = JSON.parse(JSON.stringify(skinConfig));
+        const parts = this.skin.parts || {};
+        for (const [boneName, textureKey] of Object.entries(parts)) {
+            this.setAttachment(boneName, textureKey);
+        }
+        if (this.skin.defaultFace && this.faceSprite) {
+            this.setFace(this.skin.defaultFace);
+        }
+    }
+
+    resetToRags() {
+        const DEFAULT_HERO_RAGS_PARTS = {
+            body: 'hero_body_rags',
+            head: 'hero_head_base',
+            hair: 'hero_hair_curly',
+            arm_left: 'hero_arm_l_rags',
+            arm_right: 'hero_arm_r_rags',
+            leg_upper_left: 'hero_leg_l_rags',
+            leg_upper_right: 'hero_leg_r_rags',
+            foot_left: 'hero_foot_bare_l',
+            foot_right: 'hero_foot_bare_r'
+        };
+        for (const [bone, tex] of Object.entries(DEFAULT_HERO_RAGS_PARTS)) {
+            this.setAttachment(bone, tex);
+        }
+        this.setFace('idle');
+    }
+
+    celebrate(baseY = null) {
+        this.setFace('happy');
+        const armL = this.bones?.arm_left;
+        const armR = this.bones?.arm_right;
+
+        if (armL) {
+            this.scene.tweens.killTweensOf(armL);
+            armL.angle = 0;
+            this.scene.tweens.add({
+                targets: armL,
+                angle: 125,
+                duration: 180,
+                yoyo: true,
+                ease: 'Back.easeOut',
+                onComplete: () => {
+                    if (armL && armL.active) armL.angle = 0;
+                }
+            });
+        }
+        if (armR) {
+            this.scene.tweens.killTweensOf(armR);
+            armR.angle = 0;
+            this.scene.tweens.add({
+                targets: armR,
+                angle: -125,
+                duration: 180,
+                yoyo: true,
+                ease: 'Back.easeOut',
+                onComplete: () => {
+                    if (armR && armR.active) armR.angle = 0;
+                }
+            });
+        }
+
+        const targetBaseY = baseY !== null ? baseY : (this.initial?.y ?? this.y);
+        this.scene.tweens.killTweensOf(this);
+        this.scene.tweens.add({
+            targets: this,
+            y: targetBaseY - 25,
+            duration: 160,
+            yoyo: true,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                if (this.active) {
+                    this.y = targetBaseY;
+                    this.setFace(this.skin?.defaultFace || 'idle');
+                }
+            }
+        });
     }
 
     resetPose() {

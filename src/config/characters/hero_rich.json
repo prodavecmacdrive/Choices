@@ -1,0 +1,44 @@
+{
+    "id": "hero_rich",
+    "atlas": null,
+    "rootScale": {
+        "x": 0.416,
+        "y": 0.416
+    },
+    "parts": {
+        "body": "hero_rich_body",
+        "head": "hero_rich_head",
+        "hair": "hero_rich_hair",
+        "arm_left": "hero_rich_arm_l",
+        "arm_right": "hero_rich_arm_r",
+        "leg_upper_left": "hero_rich_leg_l",
+        "leg_upper_right": "hero_rich_leg_r",
+        "foot_left": "hero_rich_foot_",
+        "foot_right": "hero_rich_foot_r"
+    },
+    "faces": {
+        "idle": "hero_rich_face",
+        "happy": "hero_rich_face"
+    },
+    "defaultFace": "idle",
+    "boneOverrides": {
+        "head": {
+            "offset": {
+                "x": 0,
+                "y": -60
+            }
+        },
+        "hair": {
+            "offset": {
+                "x": 0,
+                "y": 110
+            }
+        },
+        "face": {
+            "offset": {
+                "x": 0,
+                "y": 60
+            }
+        }
+    }
+}

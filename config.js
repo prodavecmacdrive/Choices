@@ -1,5 +1,5 @@
 module.exports = {
-    'name': 'INC_mip_grknopa_choices_Embellished_UGC_Gen_EN',
+    'name': 'inc_mip_grknopa_Choices_poor_embellished_nougc_noseason_en_',
     // 'networks': ['Applovin', 'Facebook', 'Google', 'IronSource', 'Liftoff', 'TikTok', 'UnityAds', 'Vungle'],
     'networks': ['Applovin', 'Facebook', 'Google', 'Mintegral', 'Moloco', 'UnityAds'],
     'mirrors': {
@@ -14,8 +14,6 @@ module.exports = {
     'compressAtlas': true,
     'compressTexture': true,
     'compressAudio': true,
-    'compressVideo': true,
-    'videoCompression': {},
     'ios': 'https://apps.apple.com/ua/app/cash-inc-fame-fortune-game/id1270598321',
     'android': 'https://play.google.com/store/apps/details?id=com.alegrium.cong2',
 
@@ -25,12 +23,12 @@ module.exports = {
     // ── 3 build variants ─────────────────────────────────────
     'versions': {
         // Version 1 (Time Limit 60s): Full gameplay with a hard timer 60s
-        'full': { flow: ['scene-1'], audio: [], fonts: [], sheets: [], textures: [], video: [] },
+        'full_na': { flow: ['scene-1'], audio: [], fonts: [], sheets: [], textures: [] },
 
         // Version 2 (Click Limit 10): Interaction limit after 10th click/tap
-        'clicks10': { flow: ['scene-2'], audio: [], fonts: [], sheets: [], textures: [], video: [] },
+        '10cl_na': { flow: ['scene-2'], audio: [], fonts: [], sheets: [], textures: [] },
 
         // Version 3 (Click Limit 5): Hard interaction limit after 5th click/tap
-        'clicks5': { flow: ['scene-3'], audio: [], fonts: [], sheets: [], textures: [], video: [] }
+        '3cl_na': { flow: ['scene-3'], audio: [], fonts: [], sheets: [], textures: [] }
     }
 };

@@ -236,6 +236,11 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
                 this._clearHelperHand();
                 this.disableAllInteractivity();
 
+                if (typeof this.scene?.registerInteraction === 'function') {
+                    this.scene.registerInteraction('choice_card');
+                }
+                if (this.scene?.isGameOver) return;
+
                 try {
                     Utils.addAudio(this.scene, 'ui_click', 1.0);
                 } catch (e) { }
@@ -332,24 +337,32 @@ export default class ChoiceGroup extends Phaser.GameObjects.Container {
     }
 
     disableAllInteractivity() {
-        this.cards.forEach((card) => {
-            if (card.frame && typeof card.frame.disableInteractive === 'function') {
-                card.frame.disableInteractive();
-            }
-        });
+        if (this.cards) {
+            this.cards.forEach((card) => {
+                if (card.frame && typeof card.frame.disableInteractive === 'function') {
+                    card.frame.disableInteractive();
+                }
+                if (typeof card.disableInteractive === 'function') {
+                    card.disableInteractive();
+                }
+            });
+        }
     }
 
     clearCards() {
         this._clearHelperHand();
-        this.cards.forEach((card) => {
-            if (card._resetTimer) {
-                card._resetTimer.remove();
-                card._resetTimer = null;
-            }
-            this.scene.tweens.killTweensOf(card);
-            card.destroy();
-        });
-        this.cards = [];
+        if (this.cards) {
+            this.cards.forEach((card) => {
+                if (card._resetTimer) {
+                    card._resetTimer.remove();
+                    card._resetTimer = null;
+                }
+                this.scene.tweens.killTweensOf(card);
+                card.destroy();
+            });
+            this.cards = [];
+        }
+        this.removeAll(true);
     }
 
     updateLayout(isPortrait, screenWidth, screenHeight, cameraContext = null) {

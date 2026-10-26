@@ -1,0 +1,88 @@
+{
+    "dumpster": {
+        "bgTexture": "dumpster_bg",
+        "backTexture": "dumpster_back",
+        "frontTexture": "dumpster_front",
+        "bagClosedTexture": "money_bag_closed",
+        "bagOpenTexture": "money_bag_open",
+        "ratTexture": "rat",
+        "initialCashAward": 250,
+        "ratIdleDiveInterval": 2800
+    },
+    "deal": {
+        "formulaText": "$ + ... = $$$!!",
+        "speechBgColor": "#ffffff",
+        "millionaireWalkInDuration": 1500
+    },
+    "tower": {
+        "baseTexture": "tower_foother",
+        "floorTexture": "tower_floor",
+        "roofTexture": "tower_ruuf",
+        "shutterTexture": "tower_shutter",
+        "frameTexture": "card_choice_frame",
+        "upgradeBtnTexture": "btn_upgrade_green",
+        "fastHelperDelayMs": 900,
+        "floors": [
+            {
+                "floorIndex": 0,
+                "id": "floor_1",
+                "name": "COMIC STORE",
+                "roomTexture": "tower_room_2",
+                "iconTexture": "room_2_ico",
+                "initialCostLabel": "FREE",
+                "skinReward": "hero_casual2",
+                "upgrades": [
+                    { "cost": "$4.28", "income": "$2", "reward": 50 },
+                    { "cost": "$8.50", "income": "$6", "reward": 80 },
+                    { "cost": "$14.20", "income": "$11", "reward": 120 },
+                    { "cost": "$21.71", "income": "$17", "reward": 180 },
+                    { "cost": "MAX", "income": "$26", "reward": 250 }
+                ]
+            },
+            {
+                "floorIndex": 1,
+                "id": "floor_2",
+                "name": "MEDIA HQ",
+                "roomTexture": "tower_room_1",
+                "iconTexture": "room_1_ico",
+                "initialCostLabel": "$60",
+                "skinReward": "hero_gold",
+                "upgrades": [
+                    { "cost": "$42.50", "income": "$35", "reward": 350 },
+                    { "cost": "$58.00", "income": "$48", "reward": 500 },
+                    { "cost": "$74.75", "income": "$60", "reward": 750 },
+                    { "cost": "$95.00", "income": "$75", "reward": 1000 },
+                    { "cost": "MAX", "income": "$110", "reward": 1500 }
+                ]
+            },
+            {
+                "floorIndex": 2,
+                "id": "floor_3",
+                "name": "SUSHI BAR",
+                "roomTexture": "tower_room_3",
+                "iconTexture": "room_3_ico",
+                "initialCostLabel": "$120",
+                "skinReward": "hero_rich",
+                "upgrades": [
+                    { "cost": "$180", "income": "$150", "reward": 2500 },
+                    { "cost": "$320", "income": "$240", "reward": 5000 },
+                    { "cost": "$490", "income": "$380", "reward": 10000 },
+                    { "cost": "$780", "income": "$550", "reward": 25000 },
+                    { "cost": "MAX", "income": "$999B", "reward": 100000 }
+                ]
+            }
+        ],
+        "gradientPalette": [
+            { "top": "0x0b2545", "bottom": "0x3891c9" },
+            { "top": "0x0e3b43", "bottom": "0x48bfe3" },
+            { "top": "0x1d2d50", "bottom": "0x133b5c" },
+            { "top": "0x2b1055", "bottom": "0x753a88" },
+            { "top": "0x1f1c2c", "bottom": "0x928dab" },
+            { "top": "0x0f2027", "bottom": "0x2c5364" },
+            { "top": "0x1a2a6c", "bottom": "0xb21f1f" },
+            { "top": "0x3a1c71", "bottom": "0xd76d77" },
+            { "top": "0x134e5e", "bottom": "0x71b280" },
+            { "top": "0x141e30", "bottom": "0xd4af37" }
+        ]
+    }
+}

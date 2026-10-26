@@ -1,5 +1,19 @@
 {
+  "maxClicks": 10,
+  "timeLimitSec": 0,
+  "startAct": 1,
+  "enablePartyFX": false,
   "initialBalance": 500000,
+  "cameraSettings": {
+    "portrait": {
+      "zoom": 1.3,
+      "offsetY": 0
+    },
+    "landscape": {
+      "zoom": 1.3,
+      "offsetY": 290
+    }
+  },
   "economy": {
     "initialBalance": 500000,
     "start_balance": 500000,
